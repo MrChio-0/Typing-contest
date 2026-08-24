@@ -101,15 +101,7 @@ function parseCSV(csvText) {
 
 async function fetchLatestStudentList() {
     // 優先讀取 window.CONFIG，若無則退回 CONFIG
-const configObj = (typeof window !== 'undefined' && window.CONFIG) ? window.CONFIG : (typeof CONFIG !== 'undefined' ? CONFIG : {});
-        await fetch(configObj.SCRIPT_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 
-                'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify(payload)
-        });
+    const configObj = (typeof window !== 'undefined' && window.CONFIG) ? window.CONFIG : (typeof CONFIG !== 'undefined' ? CONFIG : {});
     const csvUrl = configObj.GOOGLE_SHEET_CSV_URL;
 
     if (!csvUrl) {

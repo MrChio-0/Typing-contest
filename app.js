@@ -77,7 +77,6 @@ function parseCSV(csvText) {
     const lines = csvText.trim().split('\n');
     const result = [];
     
-    // 預期 CSV 欄位順序：account, student_id, name, class, password (或含 grade/className/number)
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -86,9 +85,9 @@ function parseCSV(csvText) {
         if (cols.length >= 4) {
             result.push({
                 account: cols[0],
-                student_id: cols[1] || cols[0], // 學號（若未填則預設為帳號）
+                student_id: cols[1] || cols[0],
                 name: cols[2],
-                classId: cols[3],              // 班別座號 (如 P1A01)
+                classId: cols[3],
                 password: cols[4] || '123456',
                 grade: cols[5] || '',
                 className: cols[6] || '',
@@ -100,7 +99,6 @@ function parseCSV(csvText) {
 }
 
 async function fetchLatestStudentList() {
-    // 優先讀取 window.CONFIG，若無則退回 CONFIG
     const configObj = (typeof window !== 'undefined' && window.CONFIG) ? window.CONFIG : (typeof CONFIG !== 'undefined' ? CONFIG : {});
     const csvUrl = configObj.GOOGLE_SHEET_CSV_URL;
 

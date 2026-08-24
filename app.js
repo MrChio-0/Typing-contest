@@ -100,7 +100,11 @@ function parseCSV(csvText) {
 }
 
 async function fetchLatestStudentList() {
-    const csvUrl = CONFIG.GOOGLE_SHEET_CSV_URL;
+    // 優先讀取 window.CONFIG，若無則退回 CONFIG
+   const configObj = (typeof window !== 'undefined' && window.CONFIG) ? window.CONFIG : (typeof CONFIG !== 'undefined' ? CONFIG : {});
+await fetch(configObj.SCRIPT_URL, { ... });
+    const csvUrl = configObj.GOOGLE_SHEET_CSV_URL;
+
     if (!csvUrl) {
         console.warn('未設定 CONFIG.GOOGLE_SHEET_CSV_URL，退回使用本地預設名單');
         fallbackToDefaultStudents();

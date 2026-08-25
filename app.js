@@ -1083,11 +1083,11 @@ async function init() {
 init();
 
 // ============================================
-// 動態新增「自選 txt 文章」功能 (強制渲染版)
+// 動態新增「自選 txt 文章」功能 (index.html 專用版)
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     
-    // 建立自選文章的專屬按鈕
+    // 建立自選文章卡片
     const customBtn = document.createElement('button');
     customBtn.id = 'btn-custom-article';
     customBtn.className = 'article-card custom-article-btn';
@@ -1099,11 +1099,10 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     `;
 
-    // 取得需要綁定的元件
     const articleGrid = document.getElementById('articleGrid');
     const fileInput = document.getElementById('txt-file-input');
 
-    // 監聽 articleGrid 並插入按鈕
+    // 自動將卡片加入選單列表
     if (articleGrid) {
         const observer = new MutationObserver(() => {
             if (articleGrid.children.length > 0 && !document.getElementById('btn-custom-article')) {
@@ -1113,7 +1112,6 @@ document.addEventListener('DOMContentLoaded', () => {
         observer.observe(articleGrid, { childList: true });
     }
 
-    // 點擊觸發檔案選擇與讀取邏輯
     if (customBtn && fileInput) {
         customBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -1143,52 +1141,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const articleTitle = file.name.replace('.txt', '');
 
-                // 1. 先隨機點擊網格中的第一個預設文章按鈕，觸發系統內建的重置與初始化邏輯
-                if (articleGrid && articleGrid.children.length > 0) {
-                    const firstBtn = articleGrid.querySelector('.article-card:not(#btn-custom-article)');
-                    if (firstBtn) firstBtn.click();
-                }
+                // 1. 包裝文章資料
+                const customArticle = {
+                    id: 'custom_' + Date.now(),
+                    title: articleTitle,
+                    content: textContent,
+                    text: textContent
+                };
 
-                // 2. 強制寫入 state 全域變數
+                // 2. 寫入 state 狀態機
                 if (typeof state !== 'undefined') {
+                    state.currentArticle = customArticle;
                     state.article = textContent;
                     state.text = textContent;
-                    state.currentText = textContent;
-                    if (state.currentArticle) {
-                        state.currentArticle.title = articleTitle;
-                        state.currentArticle.content = textContent;
+                }
+
+                // 3. 嘗試使用原生 selectArticle / renderText 繪製
+                let success = false;
+
+                if (typeof selectArticle === 'function') {
+                    try {
+                        selectArticle(customArticle);
+                        success = true;
+                    } catch (err) {
+                        console.log('selectArticle 呼叫失敗，改用 renderText');
                     }
                 }
 
-                // 3. 直接寫入畫面顯示區域 (強制更新 DOM)
-                const textDisplay = document.getElementById('textDisplay') || document.querySelector('.text-display') || document.querySelector('.article-content');
-                if (textDisplay) {
-                    textDisplay.textContent = textContent;
+                if (!success && typeof renderText === 'function') {
+                    try {
+                        renderText(textContent);
+                        success = true;
+                    } catch (err) {
+                        console.log('renderText 呼叫失敗');
+                    }
                 }
 
-                // 4. 觸發繪製/初始化函式
-                if (typeof renderText === 'function') {
-                    try { renderText(textContent); } catch (e) {}
-                }
+                // 4. 重置與初始化打字遊戲狀態
                 if (typeof initGame === 'function') {
                     try { initGame(); } catch (e) {}
                 }
 
-                // 5. 關閉 Modal
+                // 5. 關閉 Modal 與更新頂部按鈕名稱
                 const articleModal = document.getElementById('articleModal');
                 if (articleModal) articleModal.classList.add('hidden');
 
-                // 6. 更新頂部按鈕名稱
                 const actionBtnText = document.getElementById('actionBtnText');
                 if (actionBtnText) {
                     actionBtnText.textContent = articleTitle;
                 }
 
-                console.log('✅ 自選文章已強制載入並更新畫面！');
+                console.log('✅ 自選文章已順利加載並重置遊戲：', articleTitle);
             };
 
             reader.readAsText(file, 'UTF-8');
-            fileInput.value = ''; // 重置 input
+            fileInput.value = '';
         });
     }
 });

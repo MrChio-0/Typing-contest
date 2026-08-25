@@ -1083,7 +1083,7 @@ async function init() {
 init();
 
 // ============================================
-// 動態新增「自選 txt 文章」功能 (index.html 專用版)
+// 動態新增「自選 txt 文章」功能 (原生系統適配版)
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -1102,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const articleGrid = document.getElementById('articleGrid');
     const fileInput = document.getElementById('txt-file-input');
 
-    // 自動將卡片加入選單列表
+    // 自動將卡片插入文章選單
     if (articleGrid) {
         const observer = new MutationObserver(() => {
             if (articleGrid.children.length > 0 && !document.getElementById('btn-custom-article')) {
@@ -1140,58 +1140,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const articleTitle = file.name.replace('.txt', '');
+                const customId = 'custom_' + Date.now();
 
-                // 1. 包裝文章資料
+                // 1. 包裝成 ARTICLES 格式並推入全域 ARTICLES 陣列
                 const customArticle = {
-                    id: 'custom_' + Date.now(),
+                    id: customId,
                     title: articleTitle,
-                    content: textContent,
-                    text: textContent
+                    content: textContent
                 };
 
-                // 2. 寫入 state 狀態機
+                if (typeof ARTICLES !== 'undefined' && Array.isArray(ARTICLES)) {
+                    ARTICLES.push(customArticle);
+                }
+
+                // 2. 直接寫入系統狀態 (完全對應 selectArticle 原生邏輯)
                 if (typeof state !== 'undefined') {
-                    state.currentArticle = customArticle;
-                    state.article = textContent;
-                    state.text = textContent;
-                }
-
-                // 3. 嘗試使用原生 selectArticle / renderText 繪製
-                let success = false;
-
-                if (typeof selectArticle === 'function') {
-                    try {
-                        selectArticle(customArticle);
-                        success = true;
-                    } catch (err) {
-                        console.log('selectArticle 呼叫失敗，改用 renderText');
+                    state.targetText = textContent;
+                    state.userInput = '';
+                    state.gameActive = false;
+                    state.isPaused = false;
+                    state.errors = 0;
+                    state.totalKeysPressed = 0;
+                    state.correctKeys = 0;
+                    state.currentStreak = 0;
+                    state.bestStreak = 0;
+                    state.startTime = null;
+                    state.pausedTime = 0;
+                    if (state.timerInterval) {
+                        clearInterval(state.timerInterval);
+                        state.timerInterval = null;
                     }
                 }
 
-                if (!success && typeof renderText === 'function') {
-                    try {
-                        renderText(textContent);
-                        success = true;
-                    } catch (err) {
-                        console.log('renderText 呼叫失敗');
-                    }
+                // 3. 重置 DOM 計時器與統計顯示
+                if (typeof dom !== 'undefined' && dom) {
+                    if (dom.timerDisplay) dom.timerDisplay.textContent = '05:00';
+                    if (dom.speedDisplay) dom.speedDisplay.textContent = '0.00';
+                    if (dom.accuracyDisplay) dom.accuracyDisplay.textContent = '100%';
+                    if (dom.errorDisplay) dom.errorDisplay.textContent = '0';
+                    if (dom.progressDisplay) dom.progressDisplay.textContent = '0%';
+                    if (dom.comboDisplay) dom.comboDisplay.textContent = '0';
+                    if (dom.pauseBtn) dom.pauseBtn.classList.add('hidden');
+                    if (dom.articleModal) dom.articleModal.classList.add('hidden');
                 }
 
-                // 4. 重置與初始化打字遊戲狀態
-                if (typeof initGame === 'function') {
-                    try { initGame(); } catch (e) {}
+                // 4. 呼叫原生渲染與鍵盤提示函式
+                if (typeof renderText === 'function') renderText();
+                if (typeof updateHint === 'function') updateHint();
+
+                // 5. 自動聚焦輸入框
+                if (dom && dom.hiddenInput) {
+                    dom.hiddenInput.focus();
                 }
 
-                // 5. 關閉 Modal 與更新頂部按鈕名稱
-                const articleModal = document.getElementById('articleModal');
-                if (articleModal) articleModal.classList.add('hidden');
-
+                // 6. 更新頂部按鈕顯示檔名
                 const actionBtnText = document.getElementById('actionBtnText');
                 if (actionBtnText) {
                     actionBtnText.textContent = articleTitle;
                 }
 
-                console.log('✅ 自選文章已順利加載並重置遊戲：', articleTitle);
+                console.log('✅ 自選文章已成功載入並重置畫面：', articleTitle);
             };
 
             reader.readAsText(file, 'UTF-8');

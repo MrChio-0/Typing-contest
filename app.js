@@ -1090,7 +1090,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 建立自選文章的專屬按鈕
     const customBtn = document.createElement('button');
     customBtn.id = 'btn-custom-article';
-    customBtn.className = 'article-card custom-article-btn'; // 使用原本的卡片樣式
+    customBtn.className = 'article-card custom-article-btn';
     customBtn.innerHTML = `
         <div class="article-icon">📁</div>
         <div class="article-info">
@@ -1103,29 +1103,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const articleGrid = document.getElementById('articleGrid');
     const fileInput = document.getElementById('txt-file-input');
 
-    // 如果 articleGrid 存在，就把自選按鈕塞在網格的最後面
-    if (articleGrid && customBtn) {
-        // 設定一個 MutationObserver 來監聽 articleGrid 何時生成完畢
+    // 監聽 articleGrid 並插入按鈕
+    if (articleGrid) {
         const observer = new MutationObserver(() => {
-            // 如果網格裡有東西，且自選按鈕還沒被加進去
             if (articleGrid.children.length > 0 && !document.getElementById('btn-custom-article')) {
                 articleGrid.appendChild(customBtn);
             }
         });
-        
-        // 開始監聽 articleGrid 內部節點的變化
         observer.observe(articleGrid, { childList: true });
     }
 
-    // 當點擊「自選文章」卡片時，觸發檔案上傳
+    // 點擊觸發檔案選擇與讀取邏輯
     if (customBtn && fileInput) {
         customBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            e.stopPropagation(); // 阻止原本 Modal 可能的點擊關閉事件
+            e.stopPropagation();
             fileInput.click();
         });
 
-        // 讀取檔案邏輯
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -1137,7 +1132,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const reader = new FileReader();
-reader.onload = (event) => {
+
+            reader.onload = (event) => {
                 const textContent = event.target.result.trim();
                 
                 if (!textContent) {
@@ -1150,7 +1146,7 @@ reader.onload = (event) => {
                     id: 'custom_' + Date.now(),
                     title: file.name.replace('.txt', ''),
                     content: textContent,
-                    text: textContent // 防呆：部分系統使用 text 欄位
+                    text: textContent
                 };
 
                 // 2. 強制寫入 state
@@ -1162,10 +1158,9 @@ reader.onload = (event) => {
 
                 // 3. 呼叫系統原生選取與渲染機制
                 try {
-                    // 嘗試用物件格式呼叫 selectArticle
                     selectArticle(customArticleObj);
                 } catch (err) {
-                    console.log('selectArticle 物件呼叫失敗，嘗試直接渲染文字');
+                    console.log('selectArticle 呼叫失敗，改用 renderText');
                     if (typeof renderText === 'function') {
                         renderText(textContent);
                     }
@@ -1187,5 +1182,10 @@ reader.onload = (event) => {
                 }
 
                 console.log('✅ 自選文章已成功載入並渲染！');
-            };
-    
+            }; // reader.onload 結束
+
+            reader.readAsText(file, 'UTF-8');
+            fileInput.value = ''; // 重置 input 允許重複選擇同檔案
+        }); // fileInput addEventListener 結束
+    } // if 結束
+}); // DOMContentLoaded 結束

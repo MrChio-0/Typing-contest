@@ -1145,51 +1145,46 @@ reader.onload = (event) => {
                     return;
                 }
 
-                // 1. 更新全域狀態 state
+                // 1. 包裝成標準文章物件
+                const customArticleObj = {
+                    id: 'custom_' + Date.now(),
+                    title: file.name.replace('.txt', ''),
+                    content: textContent,
+                    text: textContent // 防呆：部分系統使用 text 欄位
+                };
+
+                // 2. 強制寫入 state
                 if (typeof state !== 'undefined') {
+                    state.currentArticle = customArticleObj;
                     state.article = textContent;
-                    state.currentText = textContent; // 部分系統使用 currentText
+                    state.text = textContent;
                 }
 
-                // 2. 尋找原系統專門用來「選取/載入文章」的內部函式
-                let loaded = false;
-
-                // 嘗試 A：呼叫專門的 selectArticle / loadArticle 函式
-                if (typeof selectArticle === 'function') {
-                    selectArticle({ title: file.name, content: textContent });
-                    loaded = true;
-                } else if (typeof loadArticle === 'function') {
-                    loadArticle(textContent);
-                    loaded = true;
-                } 
-
-                // 嘗試 B：若無專用載入函式，強制更新文字區域 (textDisplay) 並重置遊戲
-                if (!loaded) {
-                    const textDisplay = document.getElementById('textDisplay');
-                    if (textDisplay) {
-                        // 如果系統有 renderText 或 prepareText 函式
-                        if (typeof renderText === 'function') {
-                            renderText(textContent);
-                        } else if (typeof prepareText === 'function') {
-                            prepareText(textContent);
-                        } else {
-                            // 最基礎的 DOM 強制寫入
-                            textDisplay.textContent = textContent;
-                        }
+                // 3. 呼叫系統原生選取與渲染機制
+                try {
+                    // 嘗試用物件格式呼叫 selectArticle
+                    selectArticle(customArticleObj);
+                } catch (err) {
+                    console.log('selectArticle 物件呼叫失敗，嘗試直接渲染文字');
+                    if (typeof renderText === 'function') {
+                        renderText(textContent);
                     }
-
-                    // 重新觸發遊戲初始化
-                    if (typeof initGame === 'function') initGame();
-                    if (typeof resetGame === 'function') resetGame();
                 }
 
-                // 3. 關閉 Modal
+                // 4. 重置/初始化遊戲狀態
+                if (typeof initGame === 'function') {
+                    initGame();
+                }
+
+                // 5. 關閉彈出視窗
                 const articleModal = document.getElementById('articleModal');
                 if (articleModal) articleModal.classList.add('hidden');
 
-                // 4. 更新頂部按鈕顯示檔名
+                // 6. 更新頂部按鈕顯示檔名
                 const actionBtnText = document.getElementById('actionBtnText');
-                if (actionBtnText) actionBtnText.textContent = file.name.replace('.txt', '');
-                
-                console.log('✅ 已成功將自選文章載入至打字區域：', file.name);
+                if (actionBtnText) {
+                    actionBtnText.textContent = file.name.replace('.txt', '');
+                }
+
+                console.log('✅ 自選文章已成功載入並渲染！');
             };

@@ -1083,7 +1083,7 @@ async function init() {
 init();
 
 // ============================================
-// 動態新增「自選 txt 文章」功能 (原生系統適配版)
+// 動態新增「自選 txt 文章」功能 (原生載入版)
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -1139,71 +1139,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                const articleTitle = file.name.replace('.txt', '');
+                // 產生一個不重複的 ID
                 const customId = 'custom_' + Date.now();
+                const articleTitle = file.name.replace('.txt', '');
 
-                // 1. 包裝成 ARTICLES 格式並推入全域 ARTICLES 陣列
+                // 1. 建立標準文章物件
                 const customArticle = {
                     id: customId,
                     title: articleTitle,
-                    content: textContent
+                    content: textContent,
+                    category: '自選文章',
+                    level: '自訂'
                 };
 
+                // 2. 塞入系統的全域 ARTICLES 陣列中
                 if (typeof ARTICLES !== 'undefined' && Array.isArray(ARTICLES)) {
+                    // 如果之前上傳過自選文章，先移除舊的自選文章（保持選單乾淨）
+                    const existingIndex = ARTICLES.findIndex(a => a.id && a.id.startsWith('custom_'));
+                    if (existingIndex !== -1) {
+                        ARTICLES.splice(existingIndex, 1);
+                    }
                     ARTICLES.push(customArticle);
                 }
 
-                // 2. 直接寫入系統狀態 (完全對應 selectArticle 原生邏輯)
-                if (typeof state !== 'undefined') {
-                    state.targetText = textContent;
-                    state.userInput = '';
-                    state.gameActive = false;
-                    state.isPaused = false;
-                    state.errors = 0;
-                    state.totalKeysPressed = 0;
-                    state.correctKeys = 0;
-                    state.currentStreak = 0;
-                    state.bestStreak = 0;
-                    state.startTime = null;
-                    state.pausedTime = 0;
-                    if (state.timerInterval) {
-                        clearInterval(state.timerInterval);
-                        state.timerInterval = null;
-                    }
+                // 3. 直接呼叫系統原生的 selectArticle 載入這篇文章！
+                if (typeof selectArticle === 'function') {
+                    selectArticle(customId);
+                } else {
+                    // 備用防禦：若 selectArticle 失敗才手動寫入 state 並 render
+                    if (typeof state !== 'undefined') state.targetText = textContent;
+                    if (typeof renderText === 'function') renderText();
+                    if (typeof updateHint === 'function') updateHint();
                 }
 
-                // 3. 重置 DOM 計時器與統計顯示
-                if (typeof dom !== 'undefined' && dom) {
-                    if (dom.timerDisplay) dom.timerDisplay.textContent = '05:00';
-                    if (dom.speedDisplay) dom.speedDisplay.textContent = '0.00';
-                    if (dom.accuracyDisplay) dom.accuracyDisplay.textContent = '100%';
-                    if (dom.errorDisplay) dom.errorDisplay.textContent = '0';
-                    if (dom.progressDisplay) dom.progressDisplay.textContent = '0%';
-                    if (dom.comboDisplay) dom.comboDisplay.textContent = '0';
-                    if (dom.pauseBtn) dom.pauseBtn.classList.add('hidden');
-                    if (dom.articleModal) dom.articleModal.classList.add('hidden');
-                }
-
-                // 4. 呼叫原生渲染與鍵盤提示函式
-                if (typeof renderText === 'function') renderText();
-                if (typeof updateHint === 'function') updateHint();
-
-                // 5. 自動聚焦輸入框
-                if (dom && dom.hiddenInput) {
-                    dom.hiddenInput.focus();
-                }
-
-                // 6. 更新頂部按鈕顯示檔名
-                const actionBtnText = document.getElementById('actionBtnText');
-                if (actionBtnText) {
-                    actionBtnText.textContent = articleTitle;
-                }
-
-                console.log('✅ 自選文章已成功載入並重置畫面：', articleTitle);
+                console.log('✅ 自選文章已透過原生 selectArticle 順利載入至遊戲區！');
             };
 
             reader.readAsText(file, 'UTF-8');
-            fileInput.value = '';
+            fileInput.value = ''; // 清空選擇器
         });
     }
 });

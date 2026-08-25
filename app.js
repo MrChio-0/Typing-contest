@@ -1137,7 +1137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const reader = new FileReader();
-            reader.onload = (event) => {
+reader.onload = (event) => {
                 const textContent = event.target.result.trim();
                 
                 if (!textContent) {
@@ -1145,31 +1145,51 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // 將內容塞入隱藏的輸入框中，並觸發遊戲重置
-                if (typeof dom !== 'undefined' && dom.hiddenInput) {
-                    dom.hiddenInput.value = ''; // 清空以免干擾
+                // 1. 更新全域狀態 state
+                if (typeof state !== 'undefined') {
+                    state.article = textContent;
+                    state.currentText = textContent; // 部分系統使用 currentText
                 }
 
-                // 取代遊戲變數中的文章內容
-                if (typeof state !== 'undefined') {
-                    state.article = textContent; 
+                // 2. 尋找原系統專門用來「選取/載入文章」的內部函式
+                let loaded = false;
+
+                // 嘗試 A：呼叫專門的 selectArticle / loadArticle 函式
+                if (typeof selectArticle === 'function') {
+                    selectArticle({ title: file.name, content: textContent });
+                    loaded = true;
+                } else if (typeof loadArticle === 'function') {
+                    loadArticle(textContent);
+                    loaded = true;
+                } 
+
+                // 嘗試 B：若無專用載入函式，強制更新文字區域 (textDisplay) 並重置遊戲
+                if (!loaded) {
+                    const textDisplay = document.getElementById('textDisplay');
+                    if (textDisplay) {
+                        // 如果系統有 renderText 或 prepareText 函式
+                        if (typeof renderText === 'function') {
+                            renderText(textContent);
+                        } else if (typeof prepareText === 'function') {
+                            prepareText(textContent);
+                        } else {
+                            // 最基礎的 DOM 強制寫入
+                            textDisplay.textContent = textContent;
+                        }
+                    }
+
+                    // 重新觸發遊戲初始化
+                    if (typeof initGame === 'function') initGame();
+                    if (typeof resetGame === 'function') resetGame();
                 }
-                
-                // 關閉 Modal
+
+                // 3. 關閉 Modal
                 const articleModal = document.getElementById('articleModal');
                 if (articleModal) articleModal.classList.add('hidden');
 
-                // 重新載入遊戲 (呼叫原有的 initGame 邏輯)
-                if (typeof initGame === 'function') {
-                    initGame();
-                }
+                // 4. 更新頂部按鈕顯示檔名
+                const actionBtnText = document.getElementById('actionBtnText');
+                if (actionBtnText) actionBtnText.textContent = file.name.replace('.txt', '');
                 
-                // 更換按鈕文字顯示成功載入
-                document.getElementById('actionBtnText').textContent = file.name;
+                console.log('✅ 已成功將自選文章載入至打字區域：', file.name);
             };
-
-            reader.readAsText(file, 'UTF-8');
-            fileInput.value = ''; // 清空以允許重複上傳
-        });
-    }
-});

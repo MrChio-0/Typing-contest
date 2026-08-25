@@ -1257,3 +1257,11 @@ input.login-input:-webkit-autofill:active {
 .hidden {
     display: none !important;
 }
+
+.custom-article-btn {
+    border: 2px dashed #6366f1 !important;
+    background-color: #f8fafc !important;
+}
+.custom-article-btn:hover {
+    background-color: #eef2ff !important;
+}

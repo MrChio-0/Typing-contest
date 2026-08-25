@@ -858,6 +858,7 @@ function togglePause() {
 // 成績雲端同步 Function (含學號 student_id)
 // ============================================
 async function uploadResults(results) {
+    // 1. 檢查是否為 DEMO
     if (state.student.id === 'DEMO' || state.student.studentId === 'DEMO') {
         dom.uploadStatus.textContent = '✅ 示範模式（成績不記錄）';
         dom.uploadStatus.className = 'upload-status success';
@@ -867,38 +868,30 @@ async function uploadResults(results) {
     dom.uploadStatus.textContent = '正在同步成績至雲端總表...';
     dom.uploadStatus.className = 'upload-status uploading';
 
-    let className = state.student.grade || '';
-    let classLetter = state.student.className || '';
-    let studentNumber = state.student.number || '';
-    
-    const classId = state.student.id || '';
-    if (!className && classId.length >= 5) {
-        className = classId.substring(0, 2);
-        classLetter = classId.substring(2, 3);
-        studentNumber = classId.substring(3);
-    }
-
-    // 完整的 Output 成績打包（包含 student_id 官方學號）
+    // 2. 組裝 Payload
     const payload = {
-        student_id: state.student.studentId, // 官方學號 (例如 2026001)
-        account: state.student.account,     // 登入帳號
-        name: state.student.name,           // 學生姓名
-        grade: className.toUpperCase(),     // 年級
-        className: classLetter.toUpperCase(),// 班別
-        number: studentNumber,              // 座號
-        accuracy: results.accuracy,         // 準確度
-        speed: results.speed,               // 字/秒
-        errors: results.errors,             // 錯字數
-        score: results.score,               // 總分
-        timestamp: new Date().toLocaleString() // 時間戳記
+        student_id: state.student.studentId || state.student.id || '',
+        account: state.student.account || '',
+        name: state.student.name || '',
+        grade: state.student.grade || '',
+        className: state.student.className || '',
+        number: state.student.number || '',
+        accuracy: results.accuracy,
+        speed: results.speed,
+        errors: results.errors,
+        score: results.score,
+        timestamp: new Date().toLocaleString()
     };
 
     console.log('正在上傳 Output 總表成績:', payload);
     
+    // 3. 發送請求 (安全讀取 CONFIG)
     try {
-        await fetch(CONFIG.SCRIPT_URL, {
+        const configObj = (typeof window !== 'undefined' && window.CONFIG) ? window.CONFIG : (typeof CONFIG !== 'undefined' ? CONFIG : {});
+        
+        await fetch(configObj.SCRIPT_URL, {
             method: 'POST',
-            mode: 'no-cors',
+            mode: 'no-cors', // 避開 CORS 阻擋
             headers: { 
                 'Content-Type': 'application/json' 
             },
@@ -907,6 +900,7 @@ async function uploadResults(results) {
         
         dom.uploadStatus.textContent = '✅ 成績已成功寫入總表！';
         dom.uploadStatus.className = 'upload-status success';
+        console.log('✅ 成績已成功發送至 GAS');
     } catch (error) {
         console.error('上傳總表失敗:', error);
         dom.uploadStatus.textContent = '❌ 同步失敗，請截圖聯繫老師';

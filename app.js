@@ -1081,3 +1081,95 @@ async function init() {
 }
 
 init();
+
+// ============================================
+// 動態新增「自選 txt 文章」功能
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // 建立自選文章的專屬按鈕
+    const customBtn = document.createElement('button');
+    customBtn.id = 'btn-custom-article';
+    customBtn.className = 'article-card custom-article-btn'; // 使用原本的卡片樣式
+    customBtn.innerHTML = `
+        <div class="article-icon">📁</div>
+        <div class="article-info">
+            <h3 class="article-title">自選文章 (.txt)</h3>
+            <div class="article-meta">從電腦上傳純文字檔</div>
+        </div>
+    `;
+
+    // 取得需要綁定的元件
+    const articleGrid = document.getElementById('articleGrid');
+    const fileInput = document.getElementById('txt-file-input');
+
+    // 如果 articleGrid 存在，就把自選按鈕塞在網格的最後面
+    if (articleGrid && customBtn) {
+        // 設定一個 MutationObserver 來監聽 articleGrid 何時生成完畢
+        const observer = new MutationObserver(() => {
+            // 如果網格裡有東西，且自選按鈕還沒被加進去
+            if (articleGrid.children.length > 0 && !document.getElementById('btn-custom-article')) {
+                articleGrid.appendChild(customBtn);
+            }
+        });
+        
+        // 開始監聽 articleGrid 內部節點的變化
+        observer.observe(articleGrid, { childList: true });
+    }
+
+    // 當點擊「自選文章」卡片時，觸發檔案上傳
+    if (customBtn && fileInput) {
+        customBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // 阻止原本 Modal 可能的點擊關閉事件
+            fileInput.click();
+        });
+
+        // 讀取檔案邏輯
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!file.name.endsWith('.txt')) {
+                alert('請選擇副檔名為 .txt 的純文字檔案！');
+                fileInput.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const textContent = event.target.result.trim();
+                
+                if (!textContent) {
+                    alert('此 .txt 檔案內容為空，請重新選擇！');
+                    return;
+                }
+
+                // 將內容塞入隱藏的輸入框中，並觸發遊戲重置
+                if (typeof dom !== 'undefined' && dom.hiddenInput) {
+                    dom.hiddenInput.value = ''; // 清空以免干擾
+                }
+
+                // 取代遊戲變數中的文章內容
+                if (typeof state !== 'undefined') {
+                    state.article = textContent; 
+                }
+                
+                // 關閉 Modal
+                const articleModal = document.getElementById('articleModal');
+                if (articleModal) articleModal.classList.add('hidden');
+
+                // 重新載入遊戲 (呼叫原有的 initGame 邏輯)
+                if (typeof initGame === 'function') {
+                    initGame();
+                }
+                
+                // 更換按鈕文字顯示成功載入
+                document.getElementById('actionBtnText').textContent = file.name;
+            };
+
+            reader.readAsText(file, 'UTF-8');
+            fileInput.value = ''; // 清空以允許重複上傳
+        });
+    }
+});

@@ -1083,7 +1083,7 @@ async function init() {
 init();
 
 // ============================================
-// 動態新增「自選 txt 文章」功能
+// 動態新增「自選 txt 文章」功能 (強制渲染版)
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -1141,51 +1141,54 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // 1. 包裝成標準文章物件
-                const customArticleObj = {
-                    id: 'custom_' + Date.now(),
-                    title: file.name.replace('.txt', ''),
-                    content: textContent,
-                    text: textContent
-                };
+                const articleTitle = file.name.replace('.txt', '');
 
-                // 2. 強制寫入 state
-                if (typeof state !== 'undefined') {
-                    state.currentArticle = customArticleObj;
-                    state.article = textContent;
-                    state.text = textContent;
+                // 1. 先隨機點擊網格中的第一個預設文章按鈕，觸發系統內建的重置與初始化邏輯
+                if (articleGrid && articleGrid.children.length > 0) {
+                    const firstBtn = articleGrid.querySelector('.article-card:not(#btn-custom-article)');
+                    if (firstBtn) firstBtn.click();
                 }
 
-                // 3. 呼叫系統原生選取與渲染機制
-                try {
-                    selectArticle(customArticleObj);
-                } catch (err) {
-                    console.log('selectArticle 呼叫失敗，改用 renderText');
-                    if (typeof renderText === 'function') {
-                        renderText(textContent);
+                // 2. 強制寫入 state 全域變數
+                if (typeof state !== 'undefined') {
+                    state.article = textContent;
+                    state.text = textContent;
+                    state.currentText = textContent;
+                    if (state.currentArticle) {
+                        state.currentArticle.title = articleTitle;
+                        state.currentArticle.content = textContent;
                     }
                 }
 
-                // 4. 重置/初始化遊戲狀態
-                if (typeof initGame === 'function') {
-                    initGame();
+                // 3. 直接寫入畫面顯示區域 (強制更新 DOM)
+                const textDisplay = document.getElementById('textDisplay') || document.querySelector('.text-display') || document.querySelector('.article-content');
+                if (textDisplay) {
+                    textDisplay.textContent = textContent;
                 }
 
-                // 5. 關閉彈出視窗
+                // 4. 觸發繪製/初始化函式
+                if (typeof renderText === 'function') {
+                    try { renderText(textContent); } catch (e) {}
+                }
+                if (typeof initGame === 'function') {
+                    try { initGame(); } catch (e) {}
+                }
+
+                // 5. 關閉 Modal
                 const articleModal = document.getElementById('articleModal');
                 if (articleModal) articleModal.classList.add('hidden');
 
-                // 6. 更新頂部按鈕顯示檔名
+                // 6. 更新頂部按鈕名稱
                 const actionBtnText = document.getElementById('actionBtnText');
                 if (actionBtnText) {
-                    actionBtnText.textContent = file.name.replace('.txt', '');
+                    actionBtnText.textContent = articleTitle;
                 }
 
-                console.log('✅ 自選文章已成功載入並渲染！');
-            }; // reader.onload 結束
+                console.log('✅ 自選文章已強制載入並更新畫面！');
+            };
 
             reader.readAsText(file, 'UTF-8');
-            fileInput.value = ''; // 重置 input 允許重複選擇同檔案
-        }); // fileInput addEventListener 結束
-    } // if 結束
-}); // DOMContentLoaded 結束
+            fileInput.value = ''; // 重置 input
+        });
+    }
+});

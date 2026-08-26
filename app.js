@@ -1083,7 +1083,7 @@ async function init() {
 init();
 
 // ============================================
-// 動態新增「自選 txt 文章」功能 (原生載入版)
+// 動態新增「自選 txt 文章」功能 (換行格式修正版)
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -1132,14 +1132,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const reader = new FileReader();
 
             reader.onload = (event) => {
-                const textContent = event.target.result.trim();
+                let rawText = event.target.result;
                 
-                if (!textContent) {
+                if (!rawText || !rawText.trim()) {
                     alert('此 .txt 檔案內容為空，請重新選擇！');
                     return;
                 }
 
-                // 產生一個不重複的 ID
+                // ============================================
+                // 🛠️ 關鍵修正：清理換行符號與行尾空格
+                // ============================================
+                // 1. 將 Windows 換行 (\r\n) 或 Mac 舊版換行 (\r) 統一轉換為 \n
+                let textContent = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+                // 2. 逐行清理每行末尾多餘的「真實空格」，確保每一行結尾直接對接 \n (Enter)
+                textContent = textContent
+                    .split('\n')
+                    .map(line => line.trimEnd()) // 清除行尾隱藏空格
+                    .join('\n')
+                    .trim();                   // 清除文章最前與最後的空行
+
                 const customId = 'custom_' + Date.now();
                 const articleTitle = file.name.replace('.txt', '');
 
@@ -1152,9 +1164,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     level: '自訂'
                 };
 
-                // 2. 塞入系統的全域 ARTICLES 陣列中
+                // 2. 塞入全域 ARTICLES 陣列中
                 if (typeof ARTICLES !== 'undefined' && Array.isArray(ARTICLES)) {
-                    // 如果之前上傳過自選文章，先移除舊的自選文章（保持選單乾淨）
+                    // 先清空舊的自選文章，保持陣列乾淨
                     const existingIndex = ARTICLES.findIndex(a => a.id && a.id.startsWith('custom_'));
                     if (existingIndex !== -1) {
                         ARTICLES.splice(existingIndex, 1);
@@ -1162,17 +1174,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     ARTICLES.push(customArticle);
                 }
 
-                // 3. 直接呼叫系統原生的 selectArticle 載入這篇文章！
+                // 3. 呼叫系統原生的 selectArticle 載入文章
                 if (typeof selectArticle === 'function') {
                     selectArticle(customId);
                 } else {
-                    // 備用防禦：若 selectArticle 失敗才手動寫入 state 並 render
                     if (typeof state !== 'undefined') state.targetText = textContent;
                     if (typeof renderText === 'function') renderText();
                     if (typeof updateHint === 'function') updateHint();
                 }
 
-                console.log('✅ 自選文章已透過原生 selectArticle 順利載入至遊戲區！');
+                console.log('✅ 自選文章已清理換行符號並順利載入！');
             };
 
             reader.readAsText(file, 'UTF-8');

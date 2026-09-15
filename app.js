@@ -1193,24 +1193,53 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
-// 監測非英文/中文輸入法警告功能 (全域最高優先級攔截 + 零扣分版)
+// 監測非英文/中文輸入法警告功能 (狀態強制還原零扣分版)
 // ============================================
 (function() {
     let isWarningShown = false;
+    let snapshotState = null;
+
+    // 拍下輸入前的正確狀態快照
+    function takeSnapshot() {
+        if (typeof state !== 'undefined' && state) {
+            snapshotState = {
+                currentIndex: state.currentIndex,
+                errors: state.errors,
+                correctKeys: state.correctKeys,
+                totalKeysPressed: state.totalKeysPressed,
+                typedText: state.typedText
+            };
+        }
+    }
+
+    // 將遊戲狀態強制還原回輸入前
+    function restoreSnapshot() {
+        if (typeof state !== 'undefined' && state && snapshotState) {
+            state.currentIndex = snapshotState.currentIndex;
+            state.errors = snapshotState.errors;
+            state.correctKeys = snapshotState.correctKeys;
+            state.totalKeysPressed = snapshotState.totalKeysPressed;
+            state.typedText = snapshotState.typedText;
+
+            // 強制重新渲染遊戲畫面，擦除錯字與錯誤紅字
+            if (typeof renderText === 'function') renderText();
+            if (typeof updateStats === 'function') updateStats();
+            if (typeof updateHint === 'function') updateHint();
+        }
+    }
 
     function handleChineseInput(e) {
-        // 1. 強制阻止事件繼續傳遞給遊戲邏輯
+        // 1. 儘可能阻止預設行為
         if (e) {
             e.preventDefault();
             e.stopPropagation();
             if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         }
 
-        // 2. 如果遊戲 state 已經誤計了錯誤，強制扣回 1 次錯誤數
-        if (typeof state !== 'undefined' && state) {
-            if (state.errors > 0) state.errors--;
-            if (state.totalKeysPressed > 0) state.totalKeysPressed--;
-        }
+        // 2. 延遲 10 毫秒執行還原，確保在原生遊戲程式「計錯」之後，將資料強制改回正確值
+        setTimeout(() => {
+            restoreSnapshot();
+        }, 10);
 
         // 3. 彈出警告
         if (!isWarningShown) {
@@ -1218,7 +1247,10 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('⚠️ 偵測到中文輸入法！\n請先切換至「英文輸入法」(按下 Shift 或 Caps Lock) 再開始打字喔！');
             
             setTimeout(() => {
+                restoreSnapshot(); // 彈窗關閉後再次確保還原
                 isWarningShown = false;
+                
+                // 清空隱藏輸入框
                 const hiddenInput = dom?.hiddenInput || document.getElementById('hiddenInput') || document.querySelector('input');
                 if (hiddenInput) {
                     hiddenInput.value = '';
@@ -1229,25 +1261,26 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
 
-    // A. 偵測 IME 組字開始 (中文輸入法按下第一個鍵時)
+    // A. 隨時持續記錄最新的合法輸入狀態
+    window.addEventListener('keydown', (e) => {
+        // 如果目前是正常的英文輸入，記錄狀態快照
+        if (!e.isComposing && e.keyCode !== 229) {
+            takeSnapshot();
+        } else {
+            // 若發現是中文 IME 按鍵，立即還原並跳警告
+            handleChineseInput(e);
+        }
+    }, true);
+
+    // B. 偵測 IME 組字開始 (中文輸入法按下第一個鍵時)
     window.addEventListener('compositionstart', (e) => {
         handleChineseInput(e);
     }, true);
 
-    // B. 在最高層級 window 的 Capture 階段優先攔截 keydown
-    window.addEventListener('keydown', (e) => {
-        // 229 為輸入法組字中 (IME) 的標準 keycode
-        if (e.isComposing || e.keyCode === 229) {
+    // C. 防禦 input 事件中的中文字符
+    window.addEventListener('input', (e) => {
+        if (e.isComposing || (e.target && /[^\x00-\x7F]/.test(e.target.value))) {
             handleChineseInput(e);
-        }
-    }, true); // true 代表在最優先的 Capture 階段執行
-
-    // C. 攔截 keypress 避免字元輸入
-    window.addEventListener('keypress', (e) => {
-        if (e.isComposing || e.keyCode === 229) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         }
     }, true);
 })();

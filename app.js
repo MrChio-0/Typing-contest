@@ -1193,45 +1193,69 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
-// 監測非英文/中文輸入法警告功能
+// 監測非英文/中文輸入法警告功能 (防誤判扣分版)
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
-    // 取得隱藏的輸入框（打字核心元件）
+    // 取得隱藏的輸入框
     const hiddenInput = dom?.hiddenInput || document.getElementById('hiddenInput') || document.querySelector('input');
     
     if (!hiddenInput) return;
 
-    let isWarningShown = false; // 防止重複跳出 alert
+    let isIMEActive = false;      // 是否正在使用 IME 輸入法
+    let isWarningShown = false;   // 防止警告視窗重複跳出
 
-    // 1. 檢測使用者開啟中文/注音/倉頡/拼音等 IME 組字輸入法
-    hiddenInput.addEventListener('compositionstart', () => {
-        showInputWarning('⚠️ 偵測到中文輸入法！\n請切換至「英文輸入法」(Caps Lock 或 Shift) 再開始打字喔！');
-    });
-
-    // 2. 檢測一般輸入中出現的非英文字元（如全形標點符號、中文字）
-    hiddenInput.addEventListener('input', (e) => {
-        const value = e.target.value;
-        // 使用 Regular Expression 檢查是否包含非 ASCII 字元 (例如中文字、全形標點)
-        const hasNonEnglish = /[^\x00-\x7F]/.test(value);
-
-        if (hasNonEnglish) {
-            showInputWarning('⚠️ 輸入內容包含非英文字元！\n請確認已切換為「英文輸入法」。');
-            // 清空輸入框中的非英文字元，避免影響打字邏輯
-            e.target.value = value.replace(/[^\x00-\x7F]/g, '');
+    // 顯示警告並阻止錯誤採計
+    function triggerIMEWarning(e) {
+        // 1. 立即阻止事件繼續傳播，防止原生打字邏輯接收到按鍵
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
         }
-    });
 
-    // 顯示警告的輔助函式 (帶冷卻時間機制)
-    function showInputWarning(message) {
+        // 2. 暫時清空輸入框，防止非英文內容殘留
+        hiddenInput.value = '';
+
         if (isWarningShown) return;
         isWarningShown = true;
 
-        alert(message);
+        // 3. 彈出警告
+        alert('⚠️ 偵測到中文輸入法！\n請先切換至「英文輸入法」(按下 Caps Lock 或 Shift) 再開始打字喔！');
 
-        // 彈出視窗關閉後，重新聚焦輸入框並解鎖警告
+        // 4. 恢復聚焦並重置狀態
         setTimeout(() => {
+            hiddenInput.value = '';
             hiddenInput.focus();
+            isIMEActive = false;
             isWarningShown = false;
-        }, 500);
+        }, 100);
     }
+
+    // 1. 偵測 IME 組字開始（切換至中文輸入法並按下第一個鍵時觸發）
+    hiddenInput.addEventListener('compositionstart', (e) => {
+        isIMEActive = true;
+        triggerIMEWarning(e);
+    });
+
+    // 2. 在 keydown 階段優先攔截，若處於 IME 狀態則不讓按鍵傳遞給遊戲邏輯
+    hiddenInput.addEventListener('keydown', (e) => {
+        // 檢查是否為 IME 輸入按鍵 (Process / 229 keycode 代表輸入法組字中)
+        if (e.isComposing || e.keyCode === 229 || isIMEActive) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isWarningShown) {
+                triggerIMEWarning(e);
+            }
+            return false;
+        }
+    }, true); // 使用 capture 階段優先攔截
+
+    // 3. 防禦性清理：若有非 ASCII 字元掉入 input 事件，立即清空且不計入錯誤
+    hiddenInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (/[^\x00-\x7F]/.test(val) || isIMEActive) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.target.value = '';
+        }
+    });
 });

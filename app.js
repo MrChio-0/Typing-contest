@@ -1191,3 +1191,47 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ============================================
+// 監測非英文/中文輸入法警告功能
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    // 取得隱藏的輸入框（打字核心元件）
+    const hiddenInput = dom?.hiddenInput || document.getElementById('hiddenInput') || document.querySelector('input');
+    
+    if (!hiddenInput) return;
+
+    let isWarningShown = false; // 防止重複跳出 alert
+
+    // 1. 檢測使用者開啟中文/注音/倉頡/拼音等 IME 組字輸入法
+    hiddenInput.addEventListener('compositionstart', () => {
+        showInputWarning('⚠️ 偵測到中文輸入法！\n請切換至「英文輸入法」(Caps Lock 或 Shift) 再開始打字喔！');
+    });
+
+    // 2. 檢測一般輸入中出現的非英文字元（如全形標點符號、中文字）
+    hiddenInput.addEventListener('input', (e) => {
+        const value = e.target.value;
+        // 使用 Regular Expression 檢查是否包含非 ASCII 字元 (例如中文字、全形標點)
+        const hasNonEnglish = /[^\x00-\x7F]/.test(value);
+
+        if (hasNonEnglish) {
+            showInputWarning('⚠️ 輸入內容包含非英文字元！\n請確認已切換為「英文輸入法」。');
+            // 清空輸入框中的非英文字元，避免影響打字邏輯
+            e.target.value = value.replace(/[^\x00-\x7F]/g, '');
+        }
+    });
+
+    // 顯示警告的輔助函式 (帶冷卻時間機制)
+    function showInputWarning(message) {
+        if (isWarningShown) return;
+        isWarningShown = true;
+
+        alert(message);
+
+        // 彈出視窗關閉後，重新聚焦輸入框並解鎖警告
+        setTimeout(() => {
+            hiddenInput.focus();
+            isWarningShown = false;
+        }, 500);
+    }
+});

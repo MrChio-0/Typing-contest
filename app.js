@@ -1286,11 +1286,11 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // ============================================
-// 1:1 還原圖片樣式：逐句淺藍框 + (請在此處打字...) 佔位提示
+// 原生結構零破壞版：無閃爍 + 進度條正常 + 正確換行
 // ============================================
 (function() {
 
-    // 1. 僅更新各句框內的文字（純 DOM 文字替換，不重新重構，絕對不閃爍）
+    // 1. 純數據更新：只改動藍框內的 HTML，不觸發 DOM 重構 (徹底防閃爍)
     function updateLineText() {
         if (typeof state === 'undefined' || !state.targetText) return;
 
@@ -1304,15 +1304,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const compEl = document.getElementById(`user-sentence-comp-${sIdx}`);
             if (!compEl) return;
 
-            // 計算目前這一句在整篇文章中的字元範圍
             const sentenceStart = globalIndex;
-            const sentenceEnd = globalIndex + sentenceText.length;
 
             if (userInput.length <= sentenceStart) {
-                // 尚未打到這一句：顯示灰色 ( 請在此處打字... )
+                // 尚未打到這一句：顯示 ( 請在此處打字... )
                 compEl.innerHTML = '<span class="line-char-placeholder">( 請在此處打字... )</span>';
             } else {
-                // 正在打或已打完這一句：逐字比對並渲染輸入的文字
+                // 已開始輸入該句：比對字元
                 let lineHtml = '';
 
                 for (let i = 0; i < sentenceText.length; i++) {
@@ -1331,71 +1329,56 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                // 若該句剛剛開始輸入但為空，保留輕微游標提示
                 compEl.innerHTML = lineHtml || '<span class="line-char-correct">&nbsp;</span>';
             }
 
-            // 累加長度 (含 '\n' 換行)
-            globalIndex += sentenceText.length + 1;
+            globalIndex += sentenceText.length + 1; // 加上 \n 換行長度
         });
     }
 
-    // 2. 建構圖片中的 DOM 結構：原文章句子 + 淺藍輸入框
-    function renderImageStyleLayout() {
+    // 2. 懸浮插隊掛載藍框：完全不移動原生的 <span> 節點，保障進度條與自動換行
+    function injectComparisonBoxes() {
         const textDisplay = document.getElementById('textDisplay');
         if (!textDisplay || typeof state === 'undefined' || !state.targetText) return;
 
-        // 若已經渲染過此佈局，只刷新內容
-        if (textDisplay.querySelector('.sentence-wrapper')) {
+        // 若藍框已存在且數量對應，僅更新文字，不重新建立 (防止打字閃爍)
+        const sentences = state.targetText.split('\n');
+        if (document.querySelectorAll('.user-line-input').length === sentences.length) {
             updateLineText();
             return;
         }
 
-        const charSpans = Array.from(textDisplay.querySelectorAll('span'));
-        if (charSpans.length === 0) return;
+        // 清除舊藍框
+        document.querySelectorAll('.user-line-input').forEach(el => el.remove());
 
-        const targetText = state.targetText;
-        const sentences = targetText.split('\n');
+        const spans = Array.from(textDisplay.querySelectorAll('span'));
+        let sentenceIdx = 0;
 
-        // 清空原容器，重新打包成圖中的樣式
-        textDisplay.innerHTML = '';
-
-        let spanIndex = 0;
-
-        sentences.forEach((sentenceText, sIdx) => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'sentence-wrapper';
-
-            // 原文章句子容器
-            const originalLine = document.createElement('div');
-            originalLine.className = 'original-sentence';
-
-            // 移入原生的 span（完整保留原文章高亮與字型）
-            for (let i = 0; i < sentenceText.length; i++) {
-                if (charSpans[spanIndex]) {
-                    originalLine.appendChild(charSpans[spanIndex]);
-                    spanIndex++;
-                }
+        // 尋找原生 DOM 中代表 '\n' 換行的 span 節點
+        spans.forEach((span) => {
+            if (span.textContent === '\n' || span.innerText === '\n') {
+                const compBox = document.createElement('div');
+                compBox.id = `user-sentence-comp-${sentenceIdx}`;
+                compBox.className = 'user-line-input';
+                
+                // 直接插入在 '\n' 換行 span 的正下方
+                span.parentNode.insertBefore(compBox, span.nextSibling);
+                sentenceIdx++;
             }
-            // 跳過 '\n' 的 span
-            if (charSpans[spanIndex] && (charSpans[spanIndex].textContent === '\n' || charSpans[spanIndex].innerText === '\n')) {
-                spanIndex++;
-            }
-
-            // 圖片樣式的淺藍色對照輸入框
-            const compBox = document.createElement('div');
-            compBox.id = `user-sentence-comp-${sIdx}`;
-            compBox.className = 'user-line-input';
-
-            wrapper.appendChild(originalLine);
-            wrapper.appendChild(compBox);
-            textDisplay.appendChild(wrapper);
         });
+
+        // 處理文章最後一句（若末尾沒有 \n）
+        if (sentenceIdx < sentences.length && !document.getElementById(`user-sentence-comp-${sentenceIdx}`)) {
+            const compBox = document.createElement('div');
+            compBox.id = `user-sentence-comp-${sentenceIdx}`;
+            compBox.className = 'user-line-input';
+            textDisplay.appendChild(compBox);
+        }
 
         updateLineText();
     }
 
-    // 3. 監聽打字事件
+    // 3. 監聽輸入框：打字時僅刷新藍框數據
     window.addEventListener('DOMContentLoaded', () => {
         const hiddenInput = dom?.hiddenInput || document.getElementById('hiddenInput') || document.querySelector('input');
 
@@ -1405,12 +1388,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 4. Hook 鉤子：在原生的 renderText 完成後，自動套用圖片樣式
+    // 4. Hook 鉤子：在原生 renderText 執行後掛載藍框（保留原生所有高亮與進度條算式）
     const originalRenderText = window.renderText;
     if (typeof originalRenderText === 'function') {
         window.renderText = function(...args) {
             const result = originalRenderText.apply(this, args);
-            setTimeout(renderImageStyleLayout, 20);
+            // 延遲 30ms 等原生進度條與字元 DOM 繪製完畢後掛載
+            setTimeout(injectComparisonBoxes, 30);
             return result;
         };
     }

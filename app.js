@@ -1286,47 +1286,11 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // ============================================
-// 逐句下方對照列 (極速流暢、不破壞原樣、不閃爍版)
+// 1:1 還原圖片樣式：逐句淺藍框 + (請在此處打字...) 佔位提示
 // ============================================
 (function() {
 
-    // 1. 建立對照列 DOM 結構 (僅在換文章或重置時執行一次，防止打字閃爍)
-    function setupLineInputs() {
-        const textDisplay = document.getElementById('textDisplay');
-        if (!textDisplay || typeof state === 'undefined' || !state.targetText) return;
-
-        // 如果已經建立過，就不要重新刪除建立，避免畫面閃爍
-        if (textDisplay.querySelector('.user-line-input')) return;
-
-        const targetText = state.targetText;
-        const sentences = targetText.split('\n');
-        const charSpans = Array.from(textDisplay.querySelectorAll('span'));
-
-        let sentenceIdx = 0;
-
-        // 搜尋 DOM 中代表換行 `\n` 的 span 節點，並在句末插隊放入對照列
-        charSpans.forEach((span) => {
-            if (span.textContent === '\n' || span.innerText === '\n') {
-                const compLine = document.createElement('div');
-                compLine.id = `user-sentence-comp-${sentenceIdx}`;
-                compLine.className = 'user-line-input';
-                span.parentNode.insertBefore(compLine, span.nextSibling);
-                sentenceIdx++;
-            }
-        });
-
-        // 最後一句（如果結尾沒有 \n，直接加在 textDisplay 最底部）
-        if (sentenceIdx < sentences.length && !document.getElementById(`user-sentence-comp-${sentenceIdx}`)) {
-            const compLine = document.createElement('div');
-            compLine.id = `user-sentence-comp-${sentenceIdx}`;
-            compLine.className = 'user-line-input';
-            textDisplay.appendChild(compLine);
-        }
-
-        updateLineText();
-    }
-
-    // 2. 只更新對照列裡面的文字內容 (純 innerHTML 賦值，極速且絕對不閃爍)
+    // 1. 僅更新各句框內的文字（純 DOM 文字替換，不重新重構，絕對不閃爍）
     function updateLineText() {
         if (typeof state === 'undefined' || !state.targetText) return;
 
@@ -1340,32 +1304,98 @@ document.addEventListener('DOMContentLoaded', () => {
             const compEl = document.getElementById(`user-sentence-comp-${sIdx}`);
             if (!compEl) return;
 
-            let lineHtml = '';
+            // 計算目前這一句在整篇文章中的字元範圍
+            const sentenceStart = globalIndex;
+            const sentenceEnd = globalIndex + sentenceText.length;
 
-            for (let i = 0; i < sentenceText.length; i++) {
-                const charIndex = globalIndex + i;
+            if (userInput.length <= sentenceStart) {
+                // 尚未打到這一句：顯示灰色 ( 請在此處打字... )
+                compEl.innerHTML = '<span class="line-char-placeholder">( 請在此處打字... )</span>';
+            } else {
+                // 正在打或已打完這一句：逐字比對並渲染輸入的文字
+                let lineHtml = '';
 
-                if (charIndex < userInput.length) {
-                    const userChar = userInput[charIndex];
-                    const targetChar = targetText[charIndex];
-                    const displayChar = userChar === ' ' ? '&nbsp;' : userChar;
+                for (let i = 0; i < sentenceText.length; i++) {
+                    const charIndex = globalIndex + i;
 
-                    if (userChar === targetChar) {
-                        lineHtml += `<span class="line-char-correct">${displayChar}</span>`;
-                    } else {
-                        lineHtml += `<span class="line-char-wrong">${displayChar}</span>`;
+                    if (charIndex < userInput.length) {
+                        const userChar = userInput[charIndex];
+                        const targetChar = targetText[charIndex];
+                        const displayChar = userChar === ' ' ? '&nbsp;' : userChar;
+
+                        if (userChar === targetChar) {
+                            lineHtml += `<span class="line-char-correct">${displayChar}</span>`;
+                        } else {
+                            lineHtml += `<span class="line-char-wrong">${displayChar}</span>`;
+                        }
                     }
-                } else {
-                    lineHtml += `<span class="line-char-placeholder">_</span>`;
                 }
+
+                // 若該句剛剛開始輸入但為空，保留輕微游標提示
+                compEl.innerHTML = lineHtml || '<span class="line-char-correct">&nbsp;</span>';
             }
 
-            compEl.innerHTML = lineHtml || '<span class="line-char-placeholder">_</span>';
-            globalIndex += sentenceText.length + 1; // 包含 \n
+            // 累加長度 (含 '\n' 換行)
+            globalIndex += sentenceText.length + 1;
         });
     }
 
-    // 3. 監聽輸入框：打字時只刷新文字，不重新重構 DOM
+    // 2. 建構圖片中的 DOM 結構：原文章句子 + 淺藍輸入框
+    function renderImageStyleLayout() {
+        const textDisplay = document.getElementById('textDisplay');
+        if (!textDisplay || typeof state === 'undefined' || !state.targetText) return;
+
+        // 若已經渲染過此佈局，只刷新內容
+        if (textDisplay.querySelector('.sentence-wrapper')) {
+            updateLineText();
+            return;
+        }
+
+        const charSpans = Array.from(textDisplay.querySelectorAll('span'));
+        if (charSpans.length === 0) return;
+
+        const targetText = state.targetText;
+        const sentences = targetText.split('\n');
+
+        // 清空原容器，重新打包成圖中的樣式
+        textDisplay.innerHTML = '';
+
+        let spanIndex = 0;
+
+        sentences.forEach((sentenceText, sIdx) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'sentence-wrapper';
+
+            // 原文章句子容器
+            const originalLine = document.createElement('div');
+            originalLine.className = 'original-sentence';
+
+            // 移入原生的 span（完整保留原文章高亮與字型）
+            for (let i = 0; i < sentenceText.length; i++) {
+                if (charSpans[spanIndex]) {
+                    originalLine.appendChild(charSpans[spanIndex]);
+                    spanIndex++;
+                }
+            }
+            // 跳過 '\n' 的 span
+            if (charSpans[spanIndex] && (charSpans[spanIndex].textContent === '\n' || charSpans[spanIndex].innerText === '\n')) {
+                spanIndex++;
+            }
+
+            // 圖片樣式的淺藍色對照輸入框
+            const compBox = document.createElement('div');
+            compBox.id = `user-sentence-comp-${sIdx}`;
+            compBox.className = 'user-line-input';
+
+            wrapper.appendChild(originalLine);
+            wrapper.appendChild(compBox);
+            textDisplay.appendChild(wrapper);
+        });
+
+        updateLineText();
+    }
+
+    // 3. 監聽打字事件
     window.addEventListener('DOMContentLoaded', () => {
         const hiddenInput = dom?.hiddenInput || document.getElementById('hiddenInput') || document.querySelector('input');
 
@@ -1375,12 +1405,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 4. Hook 鉤子：只有在原生 renderText() 重新渲染文章時，才觸發 setupLineInputs
+    // 4. Hook 鉤子：在原生的 renderText 完成後，自動套用圖片樣式
     const originalRenderText = window.renderText;
     if (typeof originalRenderText === 'function') {
         window.renderText = function(...args) {
             const result = originalRenderText.apply(this, args);
-            setTimeout(setupLineInputs, 20);
+            setTimeout(renderImageStyleLayout, 20);
             return result;
         };
     }

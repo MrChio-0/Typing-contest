@@ -1265,37 +1265,11 @@ input.login-input:-webkit-autofill:active {
 .custom-article-btn:hover {
     background-color: #eef2ff !important;
 }
-
-/* 每句/每行的容器 */
-.text-line-wrapper {
-    margin-bottom: 16px;
-    display: flex;
-    flex-direction: column;
-}
-
-/* 逐句包裝容器 */
-.sentence-block {
-    margin-bottom: 16px;
-    display: flex;
-    flex-direction: column;
-}
-
-/* 逐句包裝容器 */
-.sentence-wrapper {
-    margin-bottom: 20px;
-}
-
-/* 原文章句子（維持原有字型與風格） */
-.original-sentence {
-    margin-bottom: 8px;
-    font-size: inherit;
-    line-height: inherit;
-}
-
-/* 圖片風格：淺藍色圓角輸入對照框 */
+/* 圖片風格：淺藍色圓角輸入對照框 (流暢不跳動版) */
 .user-line-input {
     width: 100%;
     min-height: 42px;
+    margin: 8px 0 20px 0;
     padding: 8px 16px;
     background-color: #f4f8ff;       /* 淺藍背景 */
     border: 1px solid #d0e1fd;       /* 藍色邊框 */
@@ -1326,7 +1300,7 @@ input.login-input:-webkit-autofill:active {
     font-weight: bold;
 }
 
-/* 圖片風格：( 請在此處打字... ) 未輸入佔位符 */
+/* ( 請在此處打字... ) 未輸入佔位符 */
 .line-char-placeholder {
     color: #3b82f6;
     opacity: 0.6;

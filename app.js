@@ -1286,13 +1286,13 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // ============================================
-// 動態生成「輸入對照行」功能 (純文字顯示版)
+// 動態生成「輸入對照行」功能 (嚴格按 ENTER / 段落切割版)
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     const textDisplay = document.getElementById('textDisplay');
     if (!textDisplay) return;
 
-    // 更新對照行內容的核心邏輯 (純顯示學生輸入內容)
+    // 即時同步學生輸入的文字到對應的段落對照框中
     function syncInputDisplay() {
         if (typeof state === 'undefined' || !state) return;
 
@@ -1309,129 +1309,114 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputDisplay = block.querySelector('.typing-line-input-display');
             if (!targetLine || !inputDisplay) return;
 
-            // 取得這一行包含的所有題目字元 span
+            // 計算這個段落包含的字元數
             const charSpans = Array.from(targetLine.querySelectorAll('span'));
-            const lineLength = charSpans.length;
+            const segmentLength = charSpans.length;
 
-            // 切割出屬於這一行區段的學生輸入文字
-            const lineTyped = typedText.slice(charCountSoFar, charCountSoFar + lineLength);
-            charCountSoFar += lineLength;
+            // 切割出屬於這個段落的學生輸入內容
+            const segmentTyped = typedText.slice(charCountSoFar, charCountSoFar + segmentLength);
+            charCountSoFar += segmentLength;
 
-            // 判斷這一行是否正在打字中，給予外框高亮
-            if (lineTyped.length > 0 || (typedText.length >= (charCountSoFar - lineLength) && typedText.length <= charCountSoFar)) {
+            // 判斷當前游標是否落在此段落
+            if (segmentTyped.length > 0 || (typedText.length >= (charCountSoFar - segmentLength) && typedText.length <= charCountSoFar)) {
                 block.classList.add('active');
             } else {
                 block.classList.remove('active');
             }
 
-            // 如果學生還沒在這行輸入任何字，顯示預設提示 "( 請在此處打字... )"
-            if (lineTyped.length === 0) {
+            // 若該段落尚未打字，顯示預設提示
+            if (segmentTyped.length === 0) {
                 inputDisplay.innerHTML = `<span class="typing-input-placeholder">( 請在此處打字... )</span>`;
             } else {
-                // 單純將學生打出來的文字轉成 HTML，不進行任何正確/錯誤的判斷與紅字高亮
-                let displayText = lineTyped
+                // 純粹顯示學生輸入內容，轉換特殊字元與換行顯示
+                let displayText = segmentTyped
                     .replace(/&/g, "&amp;")
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;")
-                    .replace(/ /g, "&nbsp;") // 保持空格可見
-                    .replace(/\n/g, "↵");    // Enter 換行顯示符號
+                    .replace(/ /g, "&nbsp;")
+                    .replace(/\n/g, "↵");
 
                 inputDisplay.innerHTML = displayText;
             }
         });
     }
 
-    // 將原生渲染的每行文字，為其下方加上淺藍對照框
-    function rebuildLinesWithInputBox() {
-        if (textDisplay.querySelector('.typing-line-block')) return;
+    // 重新按文章段落 (ENTER) 構建 UI
+    function rebuildSegmentsWithInputBox() {
+        if (!textDisplay || textDisplay.querySelector('.typing-line-block')) return;
 
-        // 優先搜尋系統結構中的段落/行 (如 .line, .text-line, p, .sentence-block)
-        const lines = textDisplay.querySelectorAll('.line, .text-line, p, .sentence-block');
+        const allSpans = Array.from(textDisplay.querySelectorAll('span'));
+        if (allSpans.length === 0) return;
 
-        if (lines.length > 0) {
-            lines.forEach((line) => {
-                const block = document.createElement('div');
-                block.className = 'typing-line-block';
+        // 建立包裹容器
+        const wrapperContainer = document.createElement('div');
+        wrapperContainer.className = 'typing-segments-wrapper';
 
-                const targetDiv = document.createElement('div');
-                targetDiv.className = 'typing-line-target';
-                targetDiv.innerHTML = line.innerHTML;
+        let currentSegmentSpans = [];
 
-                const inputDiv = document.createElement('div');
-                inputDiv.className = 'typing-line-input-display';
-                inputDiv.innerHTML = `<span class="typing-input-placeholder">( 請在此處打字... )</span>`;
+        // 遍歷所有字元 span，以 Enter / 換行符號切割段落
+        allSpans.forEach((span) => {
+            currentSegmentSpans.push(span.cloneNode(true));
 
-                block.appendChild(targetDiv);
-                block.appendChild(inputDiv);
+            // 檢查該字元是否為換行符 (Enter)
+            const isEnter = span.textContent === '↵' || 
+                            span.textContent === '\n' || 
+                            span.classList.contains('enter-char') ||
+                            span.classList.contains('newline');
 
-                line.replaceWith(block);
-            });
-        } else {
-            // 若系統原本是一整串 span 混合，則自動按換行符號（Enter）切分成多行，每行皆給予一個對照框
-            const allSpans = Array.from(textDisplay.children);
-            if (allSpans.length > 0 && !allSpans[0].classList.contains('typing-line-block')) {
-                const wrapperContainer = document.createElement('div');
-                
-                let currentBlock = document.createElement('div');
-                currentBlock.className = 'typing-line-block';
-                
-                let currentTarget = document.createElement('div');
-                currentTarget.className = 'typing-line-target';
-
-                allSpans.forEach((span) => {
-                    currentTarget.appendChild(span.cloneNode(true));
-                    
-                    // 遇到換行符號切分成新行卡片
-                    if (span.textContent === '↵' || span.textContent === '\n' || span.classList.contains('enter-char')) {
-                        const inputDiv = document.createElement('div');
-                        inputDiv.className = 'typing-line-input-display';
-                        inputDiv.innerHTML = `<span class="typing-input-placeholder">( 請在此處打字... )</span>`;
-                        
-                        currentBlock.appendChild(currentTarget);
-                        currentBlock.appendChild(inputDiv);
-                        wrapperContainer.appendChild(currentBlock);
-
-                        currentBlock = document.createElement('div');
-                        currentBlock.className = 'typing-line-block';
-                        currentTarget = document.createElement('div');
-                        currentTarget.className = 'typing-line-target';
-                    }
-                });
-
-                if (currentTarget.children.length > 0) {
-                    const inputDiv = document.createElement('div');
-                    inputDiv.className = 'typing-line-input-display';
-                    inputDiv.innerHTML = `<span class="typing-input-placeholder">( 請在此處打字... )</span>`;
-                    
-                    currentBlock.appendChild(currentTarget);
-                    currentBlock.appendChild(inputDiv);
-                    wrapperContainer.appendChild(currentBlock);
-                }
-
-                if (wrapperContainer.children.length > 0) {
-                    textDisplay.innerHTML = '';
-                    textDisplay.appendChild(wrapperContainer);
-                }
+            if (isEnter) {
+                createSegmentBlock(wrapperContainer, currentSegmentSpans);
+                currentSegmentSpans = []; // 清空準備下一個段落
             }
+        });
+
+        // 處理最後一個段落（若末尾沒有 Enter 符號）
+        if (currentSegmentSpans.length > 0) {
+            createSegmentBlock(wrapperContainer, currentSegmentSpans);
         }
+
+        // 替換原生渲染結構
+        if (wrapperContainer.children.length > 0) {
+            textDisplay.innerHTML = '';
+            textDisplay.appendChild(wrapperContainer);
+        }
+
         syncInputDisplay();
     }
 
-    // 1. 監聽打字區域 DOM 的改變（換文章或重置時自動重新構建對照框）
+    // 生成單個「段落題目 + 對照框」組合塊
+    function createSegmentBlock(container, spans) {
+        const block = document.createElement('div');
+        block.className = 'typing-line-block';
+
+        const targetDiv = document.createElement('div');
+        targetDiv.className = 'typing-line-target';
+        spans.forEach(span => targetDiv.appendChild(span));
+
+        const inputDiv = document.createElement('div');
+        inputDiv.className = 'typing-line-input-display';
+        inputDiv.innerHTML = `<span class="typing-input-placeholder">( 請在此處打字... )</span>`;
+
+        block.appendChild(targetDiv);
+        block.appendChild(inputDiv);
+        container.appendChild(block);
+    }
+
+    // 1. 監聽文章變更 / 原生渲染後重新拆分段落
     const observer = new MutationObserver(() => {
         observer.disconnect();
-        rebuildLinesWithInputBox();
+        rebuildSegmentsWithInputBox();
         syncInputDisplay();
         observer.observe(textDisplay, { childList: true, subtree: true });
     });
 
     observer.observe(textDisplay, { childList: true, subtree: true });
 
-    // 2. 監聽學生鍵盤輸入，即時同步學生所打的文字到淺藍框中
+    // 2. 即時監聽打字事件更新對照框
     window.addEventListener('input', syncInputDisplay, true);
     window.addEventListener('keyup', syncInputDisplay, true);
     window.addEventListener('keydown', () => setTimeout(syncInputDisplay, 10), true);
 
-    // 初始執行一次構建
-    setTimeout(rebuildLinesWithInputBox, 300);
+    // 初始執行一次
+    setTimeout(rebuildSegmentsWithInputBox, 300);
 });

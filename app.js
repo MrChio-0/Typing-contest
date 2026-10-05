@@ -1286,27 +1286,27 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // ============================================
-// 逐句下方即時顯示對照 (無痕附著版：完全不破壞原文章樣式與判定)
+// 逐句交錯顯示對照列 (與原文章風格一致)
 // ============================================
 (function() {
-    
-    // 更新每行的輸入比對
-    function updateLineComparisons() {
+
+    // 1. 即時比對並更新每一句的輸入狀態
+    function updateSentenceComparisons() {
         if (typeof state === 'undefined' || !state.targetText) return;
 
         const targetText = state.targetText;
         const userInput = state.userInput || '';
-        const lines = targetText.split('\n');
+        const sentences = targetText.split('\n');
 
         let globalIndex = 0;
 
-        lines.forEach((lineText, lineIdx) => {
-            const compEl = document.getElementById(`user-line-comp-${lineIdx}`);
+        sentences.forEach((sentenceText, sIdx) => {
+            const compEl = document.getElementById(`user-sentence-comp-${sIdx}`);
             if (!compEl) return;
 
             let lineHtml = '';
 
-            for (let i = 0; i < lineText.length; i++) {
+            for (let i = 0; i < sentenceText.length; i++) {
                 const charIndex = globalIndex + i;
 
                 if (charIndex < userInput.length) {
@@ -1325,63 +1325,83 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             compEl.innerHTML = lineHtml || '<span class="line-char-placeholder">_</span>';
-            globalIndex += lineText.length + 1;
+            // 加上 '\n' 換行符的長度
+            globalIndex += sentenceText.length + 1;
         });
     }
 
-    // 在原生渲染好的文章每行底下「附著」一個對照框
-    function attachLineContainers() {
+    // 2. 將原生 #textDisplay 內的字元按句分開，並在每句下方插入對照區
+    function buildSentenceBlocks() {
         const textDisplay = document.getElementById('textDisplay');
         if (!textDisplay || typeof state === 'undefined' || !state.targetText) return;
 
-        // 若已存在，先將舊的對照框移除，確保不影響原生節點
-        document.querySelectorAll('.user-line-input').forEach(el => el.remove());
-
-        const targetText = state.targetText;
-        const lines = targetText.split('\n');
-
-        // 尋找原生渲染的行或段落（若無分行節點則直接掛載於 textDisplay 底部）
-        const children = Array.from(textDisplay.children);
-
-        if (children.length >= lines.length) {
-            // 如果原生系統有幫每一行建立獨立元素 (如 div 或 p)
-            lines.forEach((_, lineIdx) => {
-                const targetNode = children[lineIdx] || textDisplay;
-                const compLine = document.createElement('div');
-                compLine.id = `user-line-comp-${lineIdx}`;
-                compLine.className = 'user-line-input';
-                targetNode.after(compLine);
-            });
-        } else {
-            // 若原生系統所有文字都在同一層，則直接在 textDisplay 下方依序建立
-            lines.forEach((_, lineIdx) => {
-                const compLine = document.createElement('div');
-                compLine.id = `user-line-comp-${lineIdx}`;
-                compLine.className = 'user-line-input';
-                textDisplay.appendChild(compLine);
-            });
+        // 若已經重新建構過，只進行數據更新
+        if (textDisplay.querySelector('.sentence-block')) {
+            updateSentenceComparisons();
+            return;
         }
 
-        updateLineComparisons();
+        const charSpans = Array.from(textDisplay.querySelectorAll('span'));
+        if (charSpans.length === 0) return;
+
+        const targetText = state.targetText;
+        const sentences = targetText.split('\n');
+
+        // 清空容器，重新以「句子」為單位建構 DOM
+        textDisplay.innerHTML = '';
+
+        let spanIndex = 0;
+
+        sentences.forEach((sentenceText, sIdx) => {
+            // 建立單句包裹器
+            const sentenceBlock = document.createElement('div');
+            sentenceBlock.className = 'sentence-block';
+
+            // 原文章句子容器
+            const originalSentence = document.createElement('div');
+            originalSentence.className = 'original-sentence-line';
+
+            // 將對應數量的原生 span 移入該句容器中（保留原生的所有樣式與高亮）
+            for (let i = 0; i < sentenceText.length; i++) {
+                if (charSpans[spanIndex]) {
+                    originalSentence.appendChild(charSpans[spanIndex]);
+                    spanIndex++;
+                }
+            }
+            // 跳過 '\n' 的 span
+            if (charSpans[spanIndex] && charSpans[spanIndex].textContent === '\n') {
+                spanIndex++;
+            }
+
+            // 建立學生輸入對照區
+            const compLine = document.createElement('div');
+            compLine.id = `user-sentence-comp-${sIdx}`;
+            compLine.className = 'user-line-input';
+
+            sentenceBlock.appendChild(originalSentence);
+            sentenceBlock.appendChild(compLine);
+            textDisplay.appendChild(sentenceBlock);
+        });
+
+        updateSentenceComparisons();
     }
 
-    // 監聽輸入事件
+    // 3. 監聽打字事件
     window.addEventListener('DOMContentLoaded', () => {
         const hiddenInput = dom?.hiddenInput || document.getElementById('hiddenInput') || document.querySelector('input');
 
         if (hiddenInput) {
-            hiddenInput.addEventListener('input', () => setTimeout(updateLineComparisons, 10));
-            hiddenInput.addEventListener('keydown', () => setTimeout(updateLineComparisons, 10));
+            hiddenInput.addEventListener('input', () => setTimeout(updateSentenceComparisons, 10));
+            hiddenInput.addEventListener('keydown', () => setTimeout(updateSentenceComparisons, 10));
         }
     });
 
-    // 安全鉤子 (Hook)：在原生的 renderText 繪製完畢後執行，完全不動原生程式碼的 logic
+    // 4. Hook 鉤子：在原生的 renderText 完成後，自動將句子重新分列並插入對照區
     const originalRenderText = window.renderText;
     if (typeof originalRenderText === 'function') {
         window.renderText = function(...args) {
             const result = originalRenderText.apply(this, args);
-            // 延遲 20ms 等原生 DOM 繪製與色彩標示完畢後，再掛載對照框
-            setTimeout(attachLineContainers, 20);
+            setTimeout(buildSentenceBlocks, 30);
             return result;
         };
     }

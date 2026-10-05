@@ -1286,72 +1286,125 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // ============================================
-// 即時顯示學生輸入與原文章比對功能
+// 逐句/逐行下方即時顯示學生輸入與錯字比對
 // ============================================
 (function() {
-    // 渲染比對畫面的核心函式
-    function renderComparison() {
-        const compDisplay = document.getElementById('userComparisonDisplay');
-        if (!compDisplay || typeof state === 'undefined' || !state.targetText) return;
+    // 渲染「逐句對照列」的核心邏輯
+    function updateLineComparisons() {
+        if (typeof state === 'undefined' || !state.targetText) return;
 
-        const userInput = state.userInput || '';
         const targetText = state.targetText;
+        const userInput = state.userInput || '';
 
-        // 若尚未開始打字，顯示提示文字
-        if (userInput.length === 0) {
-            compDisplay.innerHTML = '<span class="comp-placeholder">💬 開始打字後，此處將即時比對您輸入的文字與錯字...</span>';
-            return;
-        }
+        // 將整篇文章按換行符 '\n' 切分成各句/各行
+        const lines = targetText.split('\n');
+        
+        let globalIndex = 0; // 記錄全域字元索引位置
 
-        let html = '';
+        lines.forEach((lineText, lineIdx) => {
+            const lineCompEl = document.getElementById(`user-line-comp-${lineIdx}`);
+            if (!lineCompEl) return;
 
-        // 逐字比對學生輸入的內容
-        for (let i = 0; i < userInput.length; i++) {
-            const userChar = userInput[i];
-            const targetChar = targetText[i];
+            let lineHtml = '';
+            
+            // 逐字比對該行的文字
+            for (let i = 0; i < lineText.length; i++) {
+                const charIndex = globalIndex + i;
 
-            // 處理 Enter 換行顯示
-            let displayChar = userChar;
-            if (userChar === '\n') {
-                displayChar = '↵\n';
-            } else if (userChar === ' ') {
-                displayChar = '&nbsp;';
+                if (charIndex < userInput.length) {
+                    // 學生已輸入該字元
+                    const userChar = userInput[charIndex];
+                    const targetChar = targetText[charIndex];
+
+                    let displayChar = userChar === ' ' ? '&nbsp;' : userChar;
+
+                    if (userChar === targetChar) {
+                        lineHtml += `<span class="line-char-correct">${displayChar}</span>`;
+                    } else {
+                        // 打錯時顯示學生實際輸入的錯字
+                        lineHtml += `<span class="line-char-wrong">${displayChar}</span>`;
+                    }
+                } else {
+                    // 學生尚未輸入該字元（用淡色底線或點線佔位）
+                    lineHtml += `<span class="line-char-placeholder">_</span>`;
+                }
             }
 
-            // 比對是否正確
-            if (userChar === targetChar) {
-                html += `<span class="comp-char-correct">${displayChar}</span>`;
-            } else {
-                // 打錯時顯示學生實際打出的錯字
-                html += `<span class="comp-char-wrong">${displayChar}</span>`;
-            }
-        }
+            lineCompEl.innerHTML = lineHtml || '<span class="line-char-placeholder">_</span>';
 
-        compDisplay.innerHTML = html;
+            // 累加目前行的長度 + 1 (包含換行符 '\n')
+            globalIndex += lineText.length + 1;
+        });
     }
 
-    // 監聽 input 事件，每次輸入時即時更新比對
+    // 初始化/修飾 #textDisplay 結構，在每一句下方注入對照容器
+    function setupLineContainers() {
+        const textDisplay = document.getElementById('textDisplay');
+        if (!textDisplay || typeof state === 'undefined' || !state.targetText) return;
+
+        const targetText = state.targetText;
+        const lines = targetText.split('\n');
+
+        // 如果已經建立過容器就不重複建置
+        if (document.getElementById('user-line-comp-0')) return;
+
+        // 重新備份原內容並按照行進行包裝
+        textDisplay.innerHTML = ''; 
+
+        let globalIndex = 0;
+        lines.forEach((lineText, lineIdx) => {
+            const lineWrapper = document.createElement('div');
+            lineWrapper.className = 'text-line-wrapper';
+
+            // 1. 原文章句子顯示區
+            const originalLine = document.createElement('div');
+            originalLine.className = 'original-line-text';
+            
+            // 將原本該行的字元填入
+            for (let i = 0; i < lineText.length; i++) {
+                const span = document.createElement('span');
+                span.textContent = lineText[i];
+                span.dataset.index = globalIndex + i;
+                originalLine.appendChild(span);
+            }
+            globalIndex += lineText.length + 1;
+
+            // 2. 學生輸入對照區（直接插在該句下方）
+            const compLine = document.createElement('div');
+            compLine.id = `user-line-comp-${lineIdx}`;
+            compLine.className = 'user-line-input';
+
+            lineWrapper.appendChild(originalLine);
+            lineWrapper.appendChild(compLine);
+            textDisplay.appendChild(lineWrapper);
+        });
+
+        updateLineComparisons();
+    }
+
+    // 監聽輸入事件，同步更新每行的對照列
     window.addEventListener('DOMContentLoaded', () => {
         const hiddenInput = dom?.hiddenInput || document.getElementById('hiddenInput') || document.querySelector('input');
 
         if (hiddenInput) {
             hiddenInput.addEventListener('input', () => {
-                // 稍微延遲讓遊戲 state.userInput 完成更新後再繪製
-                setTimeout(renderComparison, 10);
+                setTimeout(updateLineComparisons, 10);
             });
-
             hiddenInput.addEventListener('keydown', () => {
-                setTimeout(renderComparison, 10);
+                setTimeout(updateLineComparisons, 10);
             });
         }
     });
 
-    // 當選擇新文章或重置遊戲時，同步清空比對區
-    const originalSelectArticle = window.selectArticle;
-    if (typeof originalSelectArticle === 'function') {
-        window.selectArticle = function(...args) {
-            const result = originalSelectArticle.apply(this, args);
-            renderComparison();
+    // 鉤子 (Hook)：在原生的 renderText 或 selectArticle 執行後自動初始化分行對照
+    const originalRenderText = window.renderText;
+    if (typeof originalRenderText === 'function') {
+        window.renderText = function(...args) {
+            const result = originalRenderText.apply(this, args);
+            setTimeout(() => {
+                setupLineContainers();
+                updateLineComparisons();
+            }, 50);
             return result;
         };
     }

@@ -1280,30 +1280,44 @@ input.login-input:-webkit-autofill:active {
     flex-direction: column;
 }
 
-/* 逐句下方獨立對照列 (不影響原文章風格，防閃爍版) */
+/* 逐句包裝容器 */
+.sentence-wrapper {
+    margin-bottom: 20px;
+}
+
+/* 原文章句子（維持原有字型與風格） */
+.original-sentence {
+    margin-bottom: 8px;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+/* 圖片風格：淺藍色圓角輸入對照框 */
 .user-line-input {
-    display: block;
     width: 100%;
-    margin: 4px 0 16px 0;
-    padding: 4px 8px;
-    background-color: #f8fafc;
-    border-left: 3px solid #6366f1;
-    border-radius: 4px;
-    font-family: inherit; /* 繼承原文章字型 */
-    font-size: 0.9em;     /* 略小於原文章，層次更清晰 */
-    line-height: 1.4;
+    min-height: 42px;
+    padding: 8px 16px;
+    background-color: #f4f8ff;       /* 淺藍背景 */
+    border: 1px solid #d0e1fd;       /* 藍色邊框 */
+    border-radius: 8px;              /* 圓角 */
+    font-family: inherit;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #1e293b;
     white-space: pre-wrap;
     word-break: break-all;
     box-sizing: border-box;
+    display: flex;
+    align-items: center;
 }
 
 /* 對照區：正確字元 */
 .line-char-correct {
-    color: #10b981;
-    font-weight: bold;
+    color: #0f172a;
+    font-weight: 500;
 }
 
-/* 對照區：錯字標示 (顯眼紅底白字) */
+/* 對照區：打錯字元 (紅底白字) */
 .line-char-wrong {
     color: #ffffff;
     background-color: #ef4444;
@@ -1312,7 +1326,9 @@ input.login-input:-webkit-autofill:active {
     font-weight: bold;
 }
 
-/* 對照區：未輸入佔位符 */
+/* 圖片風格：( 請在此處打字... ) 未輸入佔位符 */
 .line-char-placeholder {
-    color: #cbd5e1;
+    color: #3b82f6;
+    opacity: 0.6;
+    font-size: 0.95rem;
 }

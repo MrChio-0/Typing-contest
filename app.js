@@ -1286,23 +1286,21 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // ============================================
-// 動態生成「輸入對照行」功能 (精準交錯 + 零衝突版)
+// 動態生成「輸入對照行」功能 (修復 Enter 錯位 + 自動滾動版)
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     const textDisplay = document.getElementById('textDisplay');
     if (!textDisplay) return;
 
-    let isUpdating = false;
+    let activeSegIndex = -1;
 
     // 1. 初始化結構：為每一個 Enter 換行段落建立專屬的對照框，直接交錯插在段落下方
     function setupInterleavedLayout() {
-        // 如果已經建立好交錯結構，就不用重新構建
         if (textDisplay.querySelector('.typing-input-display-line')) return;
 
         const spans = Array.from(textDisplay.querySelectorAll('span'));
         if (spans.length === 0) return;
 
-        // 尋找包含換行符號 (ENTER) 的 span 節點
         let segIndex = 0;
         spans.forEach((span, idx) => {
             const text = span.textContent;
@@ -1310,14 +1308,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             span.classList.contains('enter-char') || 
                             span.classList.contains('newline');
 
-            // 當遇到 Enter 或是最後一個字元時，在該 span 後面插一個淺藍對照框
             if (isEnter || idx === spans.length - 1) {
                 const inputDiv = document.createElement('div');
                 inputDiv.className = 'typing-input-display-line';
                 inputDiv.dataset.seg = segIndex;
                 inputDiv.innerHTML = `<span class="typing-input-placeholder">( 請在此處打字... )</span>`;
 
-                // 標記段落結尾 span，方便後續精準切割字數
                 span.dataset.segEnd = segIndex;
                 span.after(inputDiv);
                 
@@ -1326,13 +1322,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 2. 即時同步學生輸入內容至對應的淺藍對照框
+    // 2. 即時同步學生輸入內容至對應的淺藍對照框，並修正位移差與處理滾動
     function syncInputDisplays() {
         if (typeof state === 'undefined' || !state) return;
 
         setupInterleavedLayout();
 
-        const typedText = state.userInput || state.typedText || '';
+        // 取得原始輸入，並過濾 Enter 換行符，確保字元數與原生 span 精準 1:1 對齊
+        const rawTyped = state.userInput || state.typedText || '';
+        const cleanTyped = rawTyped.replace(/[\r\n]/g, '');
+
         const inputBoxes = textDisplay.querySelectorAll('.typing-input-display-line');
         const endSpans = textDisplay.querySelectorAll('span[data-seg-end]');
 
@@ -1341,25 +1340,39 @@ document.addEventListener('DOMContentLoaded', () => {
         const allSpans = Array.from(textDisplay.querySelectorAll('span:not(.typing-input-display-line span)'));
 
         let charStart = 0;
+        let currentActiveBox = null;
+        let newActiveIndex = -1;
 
         endSpans.forEach((endSpan, segIdx) => {
             const box = inputBoxes[segIdx];
             if (!box) return;
 
-            // 精準計算該段落結束於第幾個 span
+            // 計算該段落（排除 Enter 符號後）的實際字數
             const endIdx = allSpans.indexOf(endSpan);
-            const segmentLength = (endIdx - charStart) + 1;
+            let segmentLength = (endIdx - charStart) + 1;
 
-            // 擷取屬於該段落的學生打字內容
-            const segmentTyped = typedText.slice(charStart, charStart + segmentLength);
-            charStart += segmentLength;
+            // 若結尾 span 是 Enter 標籤，則該段落的可顯示字數需扣除 1，確保不把下段第一個字算進來
+            const endText = endSpan.textContent;
+            const isEndEnter = endText === '↵' || endText === '\n' || endText === '\r' || 
+                               endSpan.classList.contains('enter-char') || 
+                               endSpan.classList.contains('newline');
+
+            if (isEndEnter && segmentLength > 0) {
+                segmentLength -= 1;
+            }
+
+            // 擷取精準對應的學生輸入內容
+            const segmentTyped = cleanTyped.slice(charStart, charStart + segmentLength);
+            charStart += (isEndEnter ? segmentLength + 1 : segmentLength);
 
             // 判斷目前打字游標是否在此段落
-            const isCurrentSegment = typedText.length >= (charStart - segmentLength) && 
-                                     (segIdx === endSpans.length - 1 || typedText.length < charStart);
+            const isCurrentSegment = cleanTyped.length >= (charStart - (isEndEnter ? segmentLength + 1 : segmentLength)) && 
+                                     (segIdx === endSpans.length - 1 || cleanTyped.length < charStart);
 
             if (isCurrentSegment) {
                 box.classList.add('active');
+                currentActiveBox = box;
+                newActiveIndex = segIdx;
             } else {
                 box.classList.remove('active');
             }
@@ -1372,14 +1385,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     .replace(/&/g, "&amp;")
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;")
-                    .replace(/ /g, "&nbsp;")
-                    .replace(/\n/g, "↵");
+                    .replace(/ /g, "&nbsp;");
 
                 box.innerHTML = displayText;
             }
         });
+
+        // 3. 自動滾動邏輯：當打字游標切換到新的一行/新段落時，自動滾動畫面至中央
+        if (newActiveIndex !== -1 && newActiveIndex !== activeSegIndex && currentActiveBox) {
+            activeSegIndex = newActiveIndex;
+            currentActiveBox.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        }
     }
 
+    let isUpdating = false;
     function safeUpdate() {
         if (isUpdating) return;
         isUpdating = true;
@@ -1389,7 +1411,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 1. 監聽原生 DOM 更新 (換文章時自動重構)
+    // 1. 監聽原生 DOM 更新 (切換文章時重新佈局)
     const observer = new MutationObserver(() => {
         setupInterleavedLayout();
         safeUpdate();

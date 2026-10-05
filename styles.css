@@ -1267,24 +1267,16 @@ input.login-input:-webkit-autofill:active {
 }
 
 /* ============================================
-   打字區雙行對照模式 (圖片風格：單純文字顯示)
+   獨立對照框容器 (完全不干擾原生題目 DOM)
    ============================================ */
-/* 每組打字單元（題目 + 對照框） */
-.typing-line-block {
-    margin-bottom: 24px;
+#custom-input-displays-container {
+    margin-top: 16px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 16px;
 }
 
-/* 題目文字行 */
-.typing-line-target {
-    font-size: 1.35rem;
-    line-height: 1.6;
-    letter-spacing: 0.5px;
-}
-
-/* 學生輸入對照框 (淺藍背景、圓角、藍灰色邊框) */
+/* 學生輸入對照框 */
 .typing-line-input-display {
     min-height: 44px;
     padding: 8px 16px;
@@ -1299,17 +1291,17 @@ input.login-input:-webkit-autofill:active {
     align-items: center;
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.02);
     transition: border-color 0.2s, background-color 0.2s;
-    white-space: pre-wrap; /* 保持空格正常顯示 */
+    white-space: pre-wrap;
 }
 
-/* 當前打字中的行高亮框 */
-.typing-line-block.active .typing-line-input-display {
+/* 當前輸入段落高亮 */
+.typing-line-input-display.active {
     border-color: #69b1ff;
     background-color: #e6f7ff;
-    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
 }
 
-/* 未輸入時顯示的佔位提示字 ( "( 請在此處打字... )" ) */
+/* 佔位提示字 */
 .typing-input-placeholder {
     color: #4096ff;
     font-size: 1.1rem;

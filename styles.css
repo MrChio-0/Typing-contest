@@ -1280,29 +1280,30 @@ input.login-input:-webkit-autofill:active {
     flex-direction: column;
 }
 
-/* 學生逐句輸入對照區 (完全繼承原文章字型與大小) */
+/* 逐句下方獨立對照列 (不影響原文章風格，防閃爍版) */
 .user-line-input {
-    font-family: inherit;      /* 繼承原文章字型 */
-    font-size: inherit;        /* 繼承原文章字級大小 */
-    line-height: inherit;
-    letter-spacing: inherit;
-    min-height: 1.8em;
-    padding: 2px 8px;
-    margin-top: 4px;
+    display: block;
+    width: 100%;
+    margin: 4px 0 16px 0;
+    padding: 4px 8px;
     background-color: #f8fafc;
-    border-radius: 6px;
-    border-left: 4px solid #6366f1;
+    border-left: 3px solid #6366f1;
+    border-radius: 4px;
+    font-family: inherit; /* 繼承原文章字型 */
+    font-size: 0.9em;     /* 略小於原文章，層次更清晰 */
+    line-height: 1.4;
     white-space: pre-wrap;
     word-break: break-all;
+    box-sizing: border-box;
 }
 
-/* 對照區：正確字元 (與原文章正確顏色一致) */
+/* 對照區：正確字元 */
 .line-char-correct {
     color: #10b981;
     font-weight: bold;
 }
 
-/* 對照區：打錯字元 (顯眼紅底白字) */
+/* 對照區：錯字標示 (顯眼紅底白字) */
 .line-char-wrong {
     color: #ffffff;
     background-color: #ef4444;
@@ -1311,8 +1312,7 @@ input.login-input:-webkit-autofill:active {
     font-weight: bold;
 }
 
-/* 未輸入時的佔位符 */
+/* 對照區：未輸入佔位符 */
 .line-char-placeholder {
     color: #cbd5e1;
-    opacity: 0.6;
 }

@@ -1284,3 +1284,81 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, true);
 })();
+
+// ============================================
+// 即時輸入內容與原文章比對顯示功能
+// ============================================
+(function() {
+    // 動態建立比對顯示盒的 UI 結構與樣式
+    function createComparisonBox() {
+        let box = document.getElementById('input-comparison-box');
+        if (!box) {
+            const textArea = document.querySelector('.text-area') || document.querySelector('.game-container') || document.body;
+            box = document.createElement('div');
+            box.id = 'input-comparison-box';
+            box.style.cssText = `
+                margin-top: 15px;
+                padding: 12px 16px;
+                background-color: #f8f9fa;
+                border: 2px solid #e9ecef;
+                border-radius: 8px;
+                font-family: monospace, monospace;
+                font-size: 1.1rem;
+                line-height: 1.6;
+                word-break: break-all;
+                box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+            `;
+            textArea.parentNode.insertBefore(box, textArea.nextSibling);
+        }
+        return box;
+    }
+
+    // 比對文字並渲染結果
+    window.renderComparison = function() {
+        if (typeof state === 'undefined' || !state) return;
+
+        const box = createComparisonBox();
+        const typed = state.typedText || '';
+        const target = state.targetText || '';
+
+        if (typed.length === 0) {
+            box.innerHTML = `<span style="color: #a0aec0; font-style: italic;">💡 打字比對區：開始打字後，這裡會顯示你輸入的字元與比對結果...</span>`;
+            return;
+        }
+
+        let html = '<div style="font-size: 0.85rem; color: #718096; margin-bottom: 4px; font-weight: bold;">🔍 即時輸入比對：</div>';
+        
+        // 逐字比對已輸入的文字
+        for (let i = 0; i < typed.length; i++) {
+            const charTyped = typed[i];
+            const charTarget = target[i];
+
+            // 處理換行顯示
+            let displayTyped = charTyped === '\n' ? '↵\n' : (charTyped === ' ' ? '&nbsp;' : escapeHtml(charTyped));
+
+            if (charTyped === charTarget) {
+                // 正確：綠色
+                html += `<span style="color: #2e7d32; background-color: #e8f5e9; padding: 0 2px; border-radius: 2px; font-weight: bold;">${displayTyped}</span>`;
+            } else {
+                // 錯誤：紅色高亮並顯示預期字元
+                let expected = charTarget === '\n' ? '↵' : (charTarget === ' ' ? '空白' : escapeHtml(charTarget || ''));
+                html += `<span style="color: #c62828; background-color: #ffebee; text-decoration: line-through; padding: 0 2px; border-radius: 2px; font-weight: bold;" title="應為: ${expected}">${displayTyped}</span>`;
+            }
+        }
+
+        box.innerHTML = html;
+    };
+
+    function escapeHtml(str) {
+        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    // 攔截系統原生的 renderText，自動同步更新比對區
+    if (typeof renderText === 'function') {
+        const originalRenderText = renderText;
+        window.renderText = function() {
+            originalRenderText.apply(this, arguments);
+            window.renderComparison();
+        };
+    }
+})();

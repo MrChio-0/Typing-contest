@@ -1266,39 +1266,43 @@ input.login-input:-webkit-autofill:active {
     background-color: #eef2ff !important;
 }
 
-/* 比對區域整體樣式 */
-.comparison-area {
-    margin-top: 15px;
-    padding: 12px 16px;
-    background-color: #f8fafc;
-    border: 2px dashed #cbd5e1;
-    border-radius: 8px;
-    font-family: 'Courier New', Courier, monospace; /* 使用等寬字型方便對齊 */
-    font-size: 1.2rem;
-    line-height: 1.6;
-    min-height: 48px;
-    word-break: break-all;
-    white-space: pre-wrap;
+/* 每句/每行的容器 */
+.text-line-wrapper {
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
 }
 
-/* 正確輸入的字元 */
-.comp-char-correct {
+/* 學生單行輸入對照區 */
+.user-line-input {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.1rem;
+    min-height: 28px;
+    padding: 2px 6px;
+    margin-top: 4px;
+    background-color: #f1f5f9;
+    border-radius: 4px;
+    border-left: 3px solid #6366f1;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* 對照區：正確字元 */
+.line-char-correct {
     color: #10b981;
     font-weight: bold;
 }
 
-/* 打錯的字元 (紅色背景+底線) */
-.comp-char-wrong {
+/* 對照區：打錯字元（顯眼紅底白字） */
+.line-char-wrong {
     color: #ffffff;
     background-color: #ef4444;
     border-radius: 2px;
-    padding: 0 2px;
+    padding: 0 1px;
     font-weight: bold;
 }
 
-/* 提示文字 */
-.comp-placeholder {
-    color: #94a3b8;
-    font-style: italic;
-    font-size: 0.95rem;
+/* 未輸入時的淡色佔位符 */
+.line-char-placeholder {
+    color: #cbd5e1;
 }

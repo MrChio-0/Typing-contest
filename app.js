@@ -1286,79 +1286,73 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // ============================================
-// 即時輸入內容與原文章比對顯示功能
+// 即時顯示學生輸入與原文章比對功能
 // ============================================
 (function() {
-    // 動態建立比對顯示盒的 UI 結構與樣式
-    function createComparisonBox() {
-        let box = document.getElementById('input-comparison-box');
-        if (!box) {
-            const textArea = document.querySelector('.text-area') || document.querySelector('.game-container') || document.body;
-            box = document.createElement('div');
-            box.id = 'input-comparison-box';
-            box.style.cssText = `
-                margin-top: 15px;
-                padding: 12px 16px;
-                background-color: #f8f9fa;
-                border: 2px solid #e9ecef;
-                border-radius: 8px;
-                font-family: monospace, monospace;
-                font-size: 1.1rem;
-                line-height: 1.6;
-                word-break: break-all;
-                box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-            `;
-            textArea.parentNode.insertBefore(box, textArea.nextSibling);
-        }
-        return box;
-    }
+    // 渲染比對畫面的核心函式
+    function renderComparison() {
+        const compDisplay = document.getElementById('userComparisonDisplay');
+        if (!compDisplay || typeof state === 'undefined' || !state.targetText) return;
 
-    // 比對文字並渲染結果
-    window.renderComparison = function() {
-        if (typeof state === 'undefined' || !state) return;
+        const userInput = state.userInput || '';
+        const targetText = state.targetText;
 
-        const box = createComparisonBox();
-        const typed = state.typedText || '';
-        const target = state.targetText || '';
-
-        if (typed.length === 0) {
-            box.innerHTML = `<span style="color: #a0aec0; font-style: italic;">💡 打字比對區：開始打字後，這裡會顯示你輸入的字元與比對結果...</span>`;
+        // 若尚未開始打字，顯示提示文字
+        if (userInput.length === 0) {
+            compDisplay.innerHTML = '<span class="comp-placeholder">💬 開始打字後，此處將即時比對您輸入的文字與錯字...</span>';
             return;
         }
 
-        let html = '<div style="font-size: 0.85rem; color: #718096; margin-bottom: 4px; font-weight: bold;">🔍 即時輸入比對：</div>';
-        
-        // 逐字比對已輸入的文字
-        for (let i = 0; i < typed.length; i++) {
-            const charTyped = typed[i];
-            const charTarget = target[i];
+        let html = '';
 
-            // 處理換行顯示
-            let displayTyped = charTyped === '\n' ? '↵\n' : (charTyped === ' ' ? '&nbsp;' : escapeHtml(charTyped));
+        // 逐字比對學生輸入的內容
+        for (let i = 0; i < userInput.length; i++) {
+            const userChar = userInput[i];
+            const targetChar = targetText[i];
 
-            if (charTyped === charTarget) {
-                // 正確：綠色
-                html += `<span style="color: #2e7d32; background-color: #e8f5e9; padding: 0 2px; border-radius: 2px; font-weight: bold;">${displayTyped}</span>`;
+            // 處理 Enter 換行顯示
+            let displayChar = userChar;
+            if (userChar === '\n') {
+                displayChar = '↵\n';
+            } else if (userChar === ' ') {
+                displayChar = '&nbsp;';
+            }
+
+            // 比對是否正確
+            if (userChar === targetChar) {
+                html += `<span class="comp-char-correct">${displayChar}</span>`;
             } else {
-                // 錯誤：紅色高亮並顯示預期字元
-                let expected = charTarget === '\n' ? '↵' : (charTarget === ' ' ? '空白' : escapeHtml(charTarget || ''));
-                html += `<span style="color: #c62828; background-color: #ffebee; text-decoration: line-through; padding: 0 2px; border-radius: 2px; font-weight: bold;" title="應為: ${expected}">${displayTyped}</span>`;
+                // 打錯時顯示學生實際打出的錯字
+                html += `<span class="comp-char-wrong">${displayChar}</span>`;
             }
         }
 
-        box.innerHTML = html;
-    };
-
-    function escapeHtml(str) {
-        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        compDisplay.innerHTML = html;
     }
 
-    // 攔截系統原生的 renderText，自動同步更新比對區
-    if (typeof renderText === 'function') {
-        const originalRenderText = renderText;
-        window.renderText = function() {
-            originalRenderText.apply(this, arguments);
-            window.renderComparison();
+    // 監聽 input 事件，每次輸入時即時更新比對
+    window.addEventListener('DOMContentLoaded', () => {
+        const hiddenInput = dom?.hiddenInput || document.getElementById('hiddenInput') || document.querySelector('input');
+
+        if (hiddenInput) {
+            hiddenInput.addEventListener('input', () => {
+                // 稍微延遲讓遊戲 state.userInput 完成更新後再繪製
+                setTimeout(renderComparison, 10);
+            });
+
+            hiddenInput.addEventListener('keydown', () => {
+                setTimeout(renderComparison, 10);
+            });
+        }
+    });
+
+    // 當選擇新文章或重置遊戲時，同步清空比對區
+    const originalSelectArticle = window.selectArticle;
+    if (typeof originalSelectArticle === 'function') {
+        window.selectArticle = function(...args) {
+            const result = originalSelectArticle.apply(this, args);
+            renderComparison();
+            return result;
         };
     }
 })();

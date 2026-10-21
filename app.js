@@ -1,6 +1,17 @@
 // ============================================
 // State
 // ============================================
+
+// ============================================
+// GitHub 文章資料夾設定 (請修改為你的資訊)
+// ============================================
+const GITHUB_CONFIG = {
+    owner: 'your-github-username',  // 👈 你的 GitHub 帳號
+    repo: 'your-repo-name',          // 👈 你的專案名稱
+    branch: 'main',                  // 👈 分支名稱 (main 或 master)
+    folderPath: 'articles'           // 👈 放文章 .txt 的資料夾名稱
+};
+
 const state = {
     targetText: CONFIG.DEFAULT_TEXT,
     userInput: '',
@@ -375,18 +386,105 @@ function handleLogout() {
 // ============================================
 // Article Selection
 // ============================================
-function renderArticleModal() {
-    dom.articleGrid.innerHTML = ARTICLES.map(article => {
-        const catClass = article.category === 'P2' ? 'p2' : 'p3plus';
-        return `
-            <div class="article-card ${catClass}" data-id="${article.id}">
-                <div class="article-card-category">${article.category}</div>
-                <div class="article-card-title">${article.title}</div>
-                <div class="article-card-desc">${article.description}</div>
-                <div class="article-card-chars">${article.content.length} 字</div>
-            </div>
+// ============================================
+// Article Selection (GitHub 動態載入 + 上傳文章版)
+// ============================================
+async function renderArticleModal() {
+    // 顯示載入中狀態
+    dom.articleGrid.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--text-secondary);">
+            ⏳ 正在讀取 GitHub 文章清單...
+        </div>
+    `;
+
+    try {
+        // 1. 調用 GitHub API 抓取 articles 資料夾裡的所有檔案
+        const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.folderPath}?ref=${GITHUB_CONFIG.branch}`;
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) throw new Error(`GitHub 回應異常: ${response.status}`);
+
+        const files = await response.json();
+        const txtFiles = files.filter(f => f.type === 'file' && f.name.endsWith('.txt'));
+
+        // 清空選單內容
+        dom.articleGrid.innerHTML = '';
+
+        // 2. 逐一取得 .txt 文章內容並建立卡片
+        for (const file of txtFiles) {
+            const contentRes = await fetch(file.download_url);
+            let textContent = await contentRes.text();
+
+            // 格式化清理換行與空白
+            textContent = textContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+                .split('\n').map(line => line.trimEnd()).join('\n').trim();
+
+            const titleName = file.name.replace('.txt', '').replace(/[-_]/g, ' ');
+            const customId = 'gh_' + file.sha;
+
+            // 將 GitHub 文章存入 ARTICLES 陣列以供 selectArticle 讀取
+            if (typeof ARTICLES !== 'undefined' && Array.isArray(ARTICLES)) {
+                if (!ARTICLES.find(a => a.id === customId)) {
+                    ARTICLES.push({
+                        id: customId,
+                        title: titleName,
+                        content: textContent,
+                        category: 'GitHub',
+                        description: textContent.slice(0, 40) + '...'
+                    });
+                }
+            }
+
+            // 渲染 GitHub 文章卡片
+            const card = document.createElement('div');
+            card.className = 'article-card p2';
+            card.dataset.id = customId;
+            card.innerHTML = `
+                <div class="article-card-category">GitHub</div>
+                <div class="article-card-title">${titleName}</div>
+                <div class="article-card-desc">${textContent.slice(0, 40)}...</div>
+                <div class="article-card-chars">${textContent.length} 字</div>
+            `;
+            dom.articleGrid.appendChild(card);
+        }
+
+    } catch (error) {
+        console.error('GitHub 文章載入失敗:', error);
+        // 若 API 失敗（如未填寫正確 Repo），自動退回原本的 ARTICLES 預設選單
+        if (typeof ARTICLES !== 'undefined' && ARTICLES.length > 0) {
+            dom.articleGrid.innerHTML = ARTICLES.map(article => {
+                const catClass = article.category === 'P2' ? 'p2' : 'p3plus';
+                return `
+                    <div class="article-card ${catClass}" data-id="${article.id}">
+                        <div class="article-card-category">${article.category}</div>
+                        <div class="article-card-title">${article.title}</div>
+                        <div class="article-card-desc">${article.description}</div>
+                        <div class="article-card-chars">${article.content.length} 字</div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // 3. 確保最下方永遠 append 保留原本的「自選文章 (.txt)」上傳按鈕
+    if (!document.getElementById('btn-custom-article')) {
+        const customBtn = document.createElement('button');
+        customBtn.id = 'btn-custom-article';
+        customBtn.className = 'article-card custom-article-btn';
+        customBtn.style.gridColumn = '1 / -1';
+        customBtn.innerHTML = `
+            <div class="article-card-category" style="color: #6366f1;">UPLOAD</div>
+            <div class="article-card-title">📁 自選文章 (.txt)</div>
+            <div class="article-card-desc">從電腦上傳本地純文字檔</div>
         `;
-    }).join('');
+        customBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const fileInput = document.getElementById('txt-file-input');
+            if (fileInput) fileInput.click();
+        });
+        dom.articleGrid.appendChild(customBtn);
+    }
 }
 
 function openArticleModal() {

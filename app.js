@@ -1054,6 +1054,14 @@ function setupEventListeners() {
     dom.resumeBtn.addEventListener('click', togglePause);
 
     window.addEventListener('keydown', (e) => {
+        // ============================================
+        // 🔒 防作弊：禁止 Ctrl+V / Cmd+V (貼上) 與 Ctrl+C / Cmd+C (複製)
+        // ============================================
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V' || e.key === 'c' || e.key === 'C')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
         const keyId = e.key === ' ' ? 'key-space' :
                       e.key === 'Enter' ? 'key-enter' :
                       e.key === 'Backspace' ? 'key-backspace' :
@@ -1109,16 +1117,33 @@ function setupEventListeners() {
         }
     });
 
+// ============================================
+    // 🔒 防作弊：禁止右鍵貼上與任何 Paste 行為
+    // ============================================
+    dom.hiddenInput.addEventListener('paste', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    });
+
+    // 禁用題目區域的複製行為 (防止學生複製題目原文)
+    if (dom.textDisplay) {
+        dom.textDisplay.addEventListener('copy', (e) => e.preventDefault());
+        dom.textDisplay.addEventListener('cut', (e) => e.preventDefault());
+    }
+
     dom.hiddenInput.addEventListener('input', (e) => {
         if (dom.hiddenInput.dataset.blocked === 'true') return;
+
+        // 🔒 防作弊：若偵測到是貼上動作 (insertFromPaste)，直接擋掉不處理
+        if (e.inputType === 'insertFromPaste') {
+            dom.hiddenInput.value = '';
+            return;
+        }
 
         if (e.data) {
             for (const ch of e.data) {
                 if (ch) handleInput(ch);
-            }
-        } else if (e.inputType === 'insertFromPaste' && dom.hiddenInput.value) {
-            for (const ch of dom.hiddenInput.value) {
-                handleInput(ch);
             }
         }
         dom.hiddenInput.value = '';

@@ -6,8 +6,8 @@
 // GitHub 文章資料夾設定 (請修改為你的資訊)
 // ============================================
 const GITHUB_CONFIG = {
-    owner: 'your-github-username',  // 👈 你的 GitHub 帳號
-    repo: 'your-repo-name',          // 👈 你的專案名稱
+    owner: 'MrChio-0',  // 👈 你的 GitHub 帳號
+    repo: 'Typing-contest',          // 👈 你的專案名稱
     branch: 'main',                  // 👈 分支名稱 (main 或 master)
     folderPath: 'articles'           // 👈 放文章 .txt 的資料夾名稱
 };
